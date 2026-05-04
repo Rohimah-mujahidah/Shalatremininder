@@ -5,46 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     
-    <title>Jadwal Sholat Interaktif</title>
+    <title>Jadwal Sholat Premium</title>
 
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#0ea5e9">
+    <meta name="theme-color" content="#8c52ff">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Jadwal Sholat">
     
-    <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
-    <link rel="icon" type="image/x-icon" href="./assets/icons/favicon.ico">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#8c52ff',
+                        secondary: '#d099ff',
+                    }
+                }
+            }
+        }
+    </script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        ::-webkit-scrollbar-thumb { background: #d099ff; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #8c52ff; }
+        
+        /* Custom Gradient for text and backgrounds */
+        .text-gradient {
+            background: linear-gradient(to right, #8c52ff, #d099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .bg-gradient-feminine {
+            background: linear-gradient(135deg, #8c52ff, #d099ff);
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-50 overflow-x-hidden">
     <div id="root"></div>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Gagal:', err));
-            });
-        }
-    </script>
-
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
+        // --- ICONS ---
         const IconMoon = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
         const IconSunrise = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6"/><path d="M8.4 10.4 4.2 6.2"/><path d="M15.6 10.4l4.2-4.2"/><path d="M22 18h-2"/><path d="M4 18H2"/><path d="M12 14v4"/><path d="M8 22h8"/></svg>;
         const IconSun = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
@@ -60,7 +74,10 @@
         const IconPlay = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>;
         const IconSquare = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>;
         const IconUser = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+        const IconSearch = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
+        const IconCompass = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>;
 
+        // --- UTILS ---
         const formatTimeDisplay = (hours, minutes) => `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         const parseTime = (timeStr, offsetDay = 0, baseDate = new Date()) => {
             if (!timeStr) return baseDate;
@@ -84,22 +101,20 @@
             d.setHours(h, m + (offsetMinutes || 0), 0, 0);
             return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         };
-        const getCityTimeZone = (cityName) => {
-            const name = cityName.toUpperCase();
-            if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; 
-            if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar";
-            return "Asia/Jakarta"; 
-        };
         const getLocalTime = (tz) => { try { return new Date(new Date().toLocaleString('en-US', { timeZone: tz })); } catch (e) { return new Date(); } };
-        const getInitialDateStr = (tz) => {
-            const d = getLocalTime(tz);
-            return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-        };
         const safeGetItem = (key, defaultValue) => {
             try { const item = localStorage.getItem(key); return item !== null ? JSON.parse(item) : defaultValue; } catch (error) { return defaultValue; }
         };
+        
+        // Kalkulasi Dhuha: Terbit matahari + 20 menit (Standar aman)
+        const calculateDhuha = (sunriseTimeStr) => {
+            if(!sunriseTimeStr) return "00:00";
+            const [h, m] = sunriseTimeStr.split(':').map(Number);
+            const d = new Date();
+            d.setHours(h, m + 20, 0, 0);
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        }
 
-        // --- KATA-KATA PENYEMANGAT (MOTIVASI PROFESIONAL) ---
         const PRAYER_QUOTES = {
             'isya_prev': "Waktu istirahat telah tiba. Tutup malam dengan zikir dan niat baik untuk esok hari.",
             'tahajjud': "Bangunlah di saat dunia tertidur. Jadikan sepertiga malam sebagai waktu terbaik untuk memohon.",
@@ -114,65 +129,55 @@
         };
 
         const App = () => {
-            const [cities, setCities] = useState([]);
+            // STATE PREFERENCES
+            const [userName, setUserName] = useState(() => safeGetItem('sholat_user_name', "Muslimah"));
             
-            // --- STATE CUSTOM USER NAME ---
-            const [userName, setUserName] = useState(() => safeGetItem('sholat_user_name', "Hamba Allah"));
+            // STATE LOCATION & API SETTINGS
+            const [searchCityInput, setSearchCityInput] = useState(() => safeGetItem('sholat_search_city', "Jakarta"));
+            const [activeCity, setActiveCity] = useState(() => safeGetItem('sholat_search_city', "Jakarta"));
+            const [cityTimezone, setCityTimezone] = useState("Asia/Jakarta");
             
-            const [searchCity, setSearchCity] = useState(() => safeGetItem('sholat_city_name', "KOTA JAKARTA"));
-            const [selectedCityId, setSelectedCityId] = useState(() => safeGetItem('sholat_city_id', "1301"));
-            const [cityTimezone, setCityTimezone] = useState(() => safeGetItem('sholat_city_tz', "Asia/Jakarta"));
+            // 20 = Kemenag, 3 = MWL, 5 = Egypt, 2 = ISNA, 0 = Shia, 1 = Karachi, 4 = Umm Al-Qura
+            const [calcMethod, setCalcMethod] = useState(() => safeGetItem('sholat_calc_method', 20)); 
+            // 0 = Shafi'i (Standard), 1 = Hanafi
+            const [asrMethod, setAsrMethod] = useState(() => safeGetItem('sholat_asr_method', 0)); 
+
             const [jadwal, setJadwal] = useState(null);
             const [loading, setLoading] = useState(true);
-            const [currentTime, setCurrentTime] = useState(getLocalTime(cityTimezone));
-            const [currentDateStr, setCurrentDateStr] = useState(() => getInitialDateStr(cityTimezone));
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [currentDateStr, setCurrentDateStr] = useState("");
 
+            // STATE SETTINGS & AUDIO
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
             const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
             const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
             const [audioStatus, setAudioStatus] = useState("Menyiapkan audio...");
             const [isPlaying, setIsPlaying] = useState(false);
-
-            // --- STATE POPUP SHOLAT WAJIB ---
             const [prayerPopup, setPrayerPopup] = useState(null);
 
-            // --- STATE & REF ALARM TAHAJJUD ---
+            // STATE TAHAJJUD
             const [tahajjudAlarmTime, setTahajjudAlarmTime] = useState(() => safeGetItem('sholat_tahajjud_time', "03:00"));
             const [tahajjudAlarmEnabled, setTahajjudAlarmEnabled] = useState(() => safeGetItem('sholat_tahajjud_enabled', false));
             const [tahajjudCustomAudio, setTahajjudCustomAudio] = useState(() => safeGetItem('sholat_tahajjud_audio', null));
             const [isTahajjudRinging, setIsTahajjudRinging] = useState(false);
+            
+            // REFS
             const tahajjudAudioRef = useRef(null);
             const playedTahajjudRef = useRef(null);
-
             const playedAdzanRef = useRef(null);
             const isAudioUnlocked = useRef(false);
             const adzanAudioRef = useRef(null);
 
             const FALLBACK_URL = "https://rohimah-mujahidah.github.io/Shalatremininder/assets/audio/adzan2.mp3";
-            const PRIMARY_URL = "./assets/audio/adzan2.mp3";
 
-            // Audio instance initialization dan unlocker dipanggil sekali
             useEffect(() => {
                 const audio = new Audio();
                 audio.preload = "auto";
-                audio.src = PRIMARY_URL;
+                audio.src = FALLBACK_URL;
                 
-                audio.oncanplaythrough = () => {
-                    setAudioStatus(audio.src.includes(FALLBACK_URL) ? "Audio siap (Server Pusat)" : "Audio siap (Lokal)");
-                };
-
-                audio.onerror = (e) => {
-                    if (!audio.src.includes(FALLBACK_URL)) {
-                        console.warn("File lokal gagal. Beralih ke server pusat...");
-                        audio.src = FALLBACK_URL;
-                        audio.load();
-                        setAudioStatus("Lokal gagal. Menggunakan server pusat.");
-                    } else {
-                        setAudioStatus("Error: Gagal memuat semua sumber audio.");
-                    }
-                };
-
+                audio.oncanplaythrough = () => setAudioStatus("Audio siap");
+                audio.onerror = () => setAudioStatus("Error memuat audio.");
                 audio.onplay = () => setIsPlaying(true);
                 audio.onpause = () => setIsPlaying(false);
                 audio.onended = () => setIsPlaying(false);
@@ -187,14 +192,12 @@
                                 adzanAudioRef.current.pause();
                                 adzanAudioRef.current.currentTime = 0;
                                 isAudioUnlocked.current = true;
-                            }).catch(e => {
-                            });
+                            }).catch(e => {});
                         }
                     }
                     document.removeEventListener('click', unlockAudio);
                     document.removeEventListener('touchstart', unlockAudio);
                 };
-
                 document.addEventListener('click', unlockAudio);
                 document.addEventListener('touchstart', unlockAudio);
 
@@ -204,70 +207,72 @@
                 };
             }, []);
 
-            // --- INISIALISASI AUDIO & UPLOAD ALARM TAHAJJUD ---
             useEffect(() => {
                 const audio = new Audio();
-                audio.loop = true; // Alarm bangun malam akan terus berbunyi sampai dimatikan
-                if (tahajjudCustomAudio) {
-                    audio.src = tahajjudCustomAudio; // Putar dari Local Browser Storage
-                } else {
-                    audio.src = "./assets/audio/tahajjud.mp3"; // Default lokal
-                }
+                audio.loop = true; 
+                audio.src = tahajjudCustomAudio || "https://rohimah-mujahidah.github.io/Shalatremininder/assets/audio/tahajjud.mp3"; 
                 tahajjudAudioRef.current = audio;
             }, [tahajjudCustomAudio]);
 
-            const handleTahajjudUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+            const saveSetting = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} };
+
+            // FETCH DATA DARI ALADHAN API
+            const fetchJadwal = () => {
+                if (!activeCity) return;
+                setLoading(true);
                 
-                // Cek ukuran file (Maksimal 4MB agar browser tidak error/penuh)
-                if (file.size > 4 * 1024 * 1024) {
-                    alert("Ukuran file terlalu besar! Maksimal 4MB agar aman disimpan di browser.");
-                    return;
+                const d = new Date();
+                const dateParam = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+                const url = `https://api.aladhan.com/v1/timingsByCity/${dateParam}?city=${encodeURIComponent(activeCity)}&country=Indonesia&method=${calcMethod}&school=${asrMethod}`;
+
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.code === 200) {
+                            const timings = data.data.timings;
+                            const tz = data.data.meta.timezone;
+                            
+                            // Map Aladhan to App state
+                            const mappedJadwal = {
+                                tanggal: data.data.date.readable,
+                                imsak: timings.Imsak.replace(" (WIB)", ""),
+                                subuh: timings.Fajr.replace(" (WIB)", ""),
+                                terbit: timings.Sunrise.replace(" (WIB)", ""),
+                                dhuha: calculateDhuha(timings.Sunrise),
+                                dzuhur: timings.Dhuhr.replace(" (WIB)", ""),
+                                ashar: timings.Asr.replace(" (WIB)", ""),
+                                maghrib: timings.Sunset.replace(" (WIB)", ""), // Using Sunset for precise Maghrib equivalent
+                                isya: timings.Isha.replace(" (WIB)", "")
+                            };
+                            
+                            setCityTimezone(tz);
+                            setJadwal(mappedJadwal);
+                            
+                            const localNow = getLocalTime(tz);
+                            setCurrentTime(localNow);
+                            setCurrentDateStr(`${localNow.getFullYear()}/${localNow.getMonth()+1}/${localNow.getDate()}`);
+                        } else {
+                            alert("Kota tidak ditemukan atau terjadi kesalahan server.");
+                        }
+                        setLoading(false);
+                    })
+                    .catch(err => { 
+                        setLoading(false); 
+                        alert("Gagal mengambil data jadwal sholat. Periksa koneksi internet Anda.");
+                    });
+            };
+
+            // Fetch on Mount & when Api Params change
+            useEffect(() => {
+                fetchJadwal();
+            }, [activeCity, calcMethod, asrMethod]);
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                if(searchCityInput.trim() !== "") {
+                    setActiveCity(searchCityInput);
+                    saveSetting('sholat_search_city', searchCityInput);
                 }
-
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64String = reader.result;
-                    try {
-                        localStorage.setItem('sholat_tahajjud_audio', JSON.stringify(base64String));
-                        setTahajjudCustomAudio(base64String);
-                        alert("Audio alarm tahajjud berhasil disimpan secara lokal!");
-                    } catch (error) {
-                        alert("Gagal menyimpan audio. Memori browser penuh atau file terlalu besar.");
-                    }
-                };
-                reader.readAsDataURL(file);
-            };
-
-            const removeCustomTahajjud = () => {
-                localStorage.removeItem('sholat_tahajjud_audio');
-                setTahajjudCustomAudio(null);
-                alert("Audio custom dihapus. Kembali menggunakan audio tahajjud default.");
-            };
-
-            const testTahajjudAudio = () => {
-                if (tahajjudAudioRef.current) {
-                    tahajjudAudioRef.current.currentTime = 0;
-                    tahajjudAudioRef.current.play().then(() => {
-                        setTimeout(() => {
-                            tahajjudAudioRef.current.pause();
-                            tahajjudAudioRef.current.currentTime = 0;
-                        }, 14000); // Putar percobaan selama 13 detik
-                    }).catch(e => alert("Gagal memutar audio: " + e.message));
-                }
-            };
-            
-            const stopTahajjudAlarm = () => {
-                setIsTahajjudRinging(false);
-                if (tahajjudAudioRef.current) {
-                    tahajjudAudioRef.current.pause();
-                    tahajjudAudioRef.current.currentTime = 0;
-                }
-            };
-
-            const saveSetting = (key, value) => {
-                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
             };
 
             const adjustedJadwal = useMemo(() => {
@@ -290,11 +295,8 @@
                     const now = getLocalTime(cityTimezone);
                     setCurrentTime(now);
 
-                    const newDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
-                    setCurrentDateStr(prev => {
-                        if (prev !== newDateStr) return newDateStr;
-                        return prev;
-                    });
+                    const newDateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+                    setCurrentDateStr(prev => (prev !== newDateStr) ? newDateStr : prev);
 
                     if (adjustedJadwal) {
                         const currentHHMM = formatTimeDisplay(now.getHours(), now.getMinutes());
@@ -302,35 +304,26 @@
                             key => adjustedJadwal[key] === currentHHMM
                         );
                         
-                        // Menjalankan POPUP & AUDIO saat menit sholat cocok
                         if (isWajibAdzan) {
-                            const adzanId = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
-                            
-                            if (playedAdzanRef.current !== adzanId) {
-                                playedAdzanRef.current = adzanId; // Tandai sudah diputar
-                                
-                                // Tampilkan Popup Waktu Sholat Tiba
+                            const adzanId = `${newDateStr}-${isWajibAdzan}`;
+                            if (playedAdzanRef.current !== adzanId && now.getSeconds() < 10) {
+                                playedAdzanRef.current = adzanId; 
                                 setPrayerPopup({ id: isWajibAdzan, name: isWajibAdzan });
 
                                 if (audioEnabled && adzanAudioRef.current) {
                                     adzanAudioRef.current.currentTime = 0;
                                     const playPromise = adzanAudioRef.current.play();
-                                    
                                     if (playPromise !== undefined) {
-                                        playPromise.catch(error => {
-                                            setAudioStatus("Browser menahan putar otomatis. Buka pengaturan & Test Suara.");
-                                        });
+                                        playPromise.catch(error => setAudioStatus("Tertahan keamanan browser."));
                                     }
                                 }
                             }
                         }
                     }
 
-                    // --- LOGIKA PEMICU ALARM TAHAJJUD ---
                     if (tahajjudAlarmEnabled) {
                         const currentHHMM = formatTimeDisplay(now.getHours(), now.getMinutes());
-                        const todayDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
-                        const alarmId = `${todayDateStr}-${tahajjudAlarmTime}`;
+                        const alarmId = `${newDateStr}-${tahajjudAlarmTime}`;
 
                         if (currentHHMM === tahajjudAlarmTime && now.getSeconds() === 0) {
                             if (playedTahajjudRef.current !== alarmId) {
@@ -338,76 +331,23 @@
                                 setIsTahajjudRinging(true);
                                 if (tahajjudAudioRef.current) {
                                     tahajjudAudioRef.current.currentTime = 0;
-                                    tahajjudAudioRef.current.play().catch(e => console.log("Alarm tahajjud tertahan keamanan OS."));
+                                    tahajjudAudioRef.current.play().catch(e => console.log("Tertahan OS."));
                                 }
                             }
                         }
                     }
-
                 }, 1000); 
                 return () => clearInterval(timer);
             }, [cityTimezone, adjustedJadwal, audioEnabled, tahajjudAlarmEnabled, tahajjudAlarmTime]);
-
-            useEffect(() => {
-                fetch('https://api.myquran.com/v2/sholat/kota/semua')
-                    .then(res => res.json())
-                    .then(data => { if (data.status) setCities(data.data); })
-                    .catch(err => {});
-            }, []);
-
-            useEffect(() => {
-                if (!selectedCityId || !currentDateStr) return;
-                setLoading(true);
-
-                fetch(`https://api.myquran.com/v2/sholat/jadwal/${selectedCityId}/${currentDateStr}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.status) setJadwal(data.data.jadwal);
-                        setLoading(false);
-                    })
-                    .catch(err => { setLoading(false); });
-            }, [selectedCityId, currentDateStr]);
-
-            const handleCityChange = (e) => {
-                const val = e.target.value;
-                setSearchCity(val);
-                const found = cities.find(c => c.lokasi === val);
-                if (found) {
-                    setSelectedCityId(found.id);
-                    const tz = getCityTimeZone(found.lokasi);
-                    setCityTimezone(tz);
-                    setCurrentTime(getLocalTime(tz)); 
-                    setCurrentDateStr(getInitialDateStr(tz));
-                    
-                    saveSetting('sholat_city_name', found.lokasi);
-                    saveSetting('sholat_city_id', found.id);
-                    saveSetting('sholat_city_tz', tz);
-                }
-            };
 
             const toggleAudio = () => {
                 if (adzanAudioRef.current) {
                     if (!adzanAudioRef.current.paused) {
                         adzanAudioRef.current.pause();
                         adzanAudioRef.current.currentTime = 0;
-                        setAudioStatus("Audio dihentikan.");
                     } else {
-                        if (adzanAudioRef.current.error || adzanAudioRef.current.src === "") {
-                            adzanAudioRef.current.src = FALLBACK_URL;
-                            adzanAudioRef.current.load();
-                        }
-                        
                         adzanAudioRef.current.currentTime = 0;
-                        const playPromise = adzanAudioRef.current.play();
-                        
-                        if (playPromise !== undefined) {
-                            playPromise.then(() => {
-                                setAudioStatus(adzanAudioRef.current.src.includes(FALLBACK_URL) ? "Audio Server Diputar!" : "Audio Lokal Diputar!");
-                                isAudioUnlocked.current = true;
-                            }).catch(e => {
-                                setAudioStatus("Error memutar: " + e.message);
-                            });
-                        }
+                        adzanAudioRef.current.play().catch(e => setAudioStatus("Error: " + e.message));
                     }
                 }
             };
@@ -421,6 +361,22 @@
                 setIsPlaying(false);
             };
 
+            const handleTahajjudUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (file.size > 4 * 1024 * 1024) { alert("Maksimal 4MB."); return; }
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result;
+                    try {
+                        localStorage.setItem('sholat_tahajjud_audio', JSON.stringify(base64String));
+                        setTahajjudCustomAudio(base64String);
+                        alert("Audio tersimpan!");
+                    } catch (error) { alert("Gagal. Memori penuh."); }
+                };
+                reader.readAsDataURL(file);
+            };
+
             const isDayTime = useMemo(() => {
                 if (!adjustedJadwal) return true;
                 const base = getLocalTime(cityTimezone);
@@ -429,32 +385,28 @@
                 return currentTime >= terbit && currentTime < maghrib;
             }, [currentTime, adjustedJadwal, cityTimezone]);
 
-            const tzLabel = useMemo(() => {
-                if (cityTimezone === "Asia/Jayapura") return "WIT";
-                if (cityTimezone === "Asia/Makassar") return "WITA";
-                return "WIB";
-            }, [cityTimezone]);
-
             const displayDate = useMemo(() => {
                 try {
                     return new Intl.DateTimeFormat('id-ID', {
                         timeZone: cityTimezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-                    }).format(new Date());
+                    }).format(currentTime);
                 } catch (e) { return jadwal?.tanggal || ""; }
-            }, [currentDateStr, cityTimezone, jadwal]);
+            }, [currentTime, cityTimezone, jadwal]);
 
+            // --- FEMININE THEME VARIABLES ---
             const theme = {
-                bg: isDayTime ? 'bg-slate-50' : 'bg-slate-900',
-                text: isDayTime ? 'text-slate-800' : 'text-slate-50',
-                textMuted: isDayTime ? 'text-slate-500' : 'text-slate-400',
-                panel: isDayTime ? 'bg-white/80 border-slate-200 shadow-xl' : 'bg-slate-800/70 border-white/10 shadow-2xl',
-                inputBg: isDayTime ? 'bg-slate-50 border-slate-300 focus:border-emerald-500 text-slate-800' : 'bg-slate-900/50 border-slate-700 focus:border-emerald-500 text-white',
-                card: isDayTime ? 'bg-white border-slate-200 hover:shadow-md' : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800',
-                cardActiveNormal: isDayTime ? 'bg-emerald-50 border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]',
-                cardActiveHaram: isDayTime ? 'bg-red-50 border-red-400/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : 'bg-red-900/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]',
-                progressBg: isDayTime ? 'bg-slate-200 border-slate-300' : 'bg-slate-900 border-slate-700/50',
-                titleGradient: isDayTime ? 'from-emerald-600 to-teal-500' : 'from-emerald-400 to-cyan-400',
-                border: isDayTime ? 'border-slate-200' : 'border-slate-700'
+                bg: isDayTime ? 'bg-fuchsia-50/50' : 'bg-[#1a1128]',
+                text: isDayTime ? 'text-slate-800' : 'text-fuchsia-50',
+                textMuted: isDayTime ? 'text-slate-500' : 'text-fuchsia-300/70',
+                panel: isDayTime ? 'bg-white/80 border-fuchsia-200 shadow-[0_8px_30px_rgb(140,82,255,0.06)]' : 'bg-[#2d1b4e]/60 border-[#8c52ff]/20 shadow-[0_8px_30px_rgb(0,0,0,0.5)]',
+                inputBg: isDayTime ? 'bg-fuchsia-50 border-fuchsia-200 focus:border-primary text-slate-800' : 'bg-[#1a1128]/80 border-[#8c52ff]/30 focus:border-secondary text-white',
+                card: isDayTime ? 'bg-white border-fuchsia-100 hover:shadow-lg' : 'bg-[#2d1b4e]/40 border-[#8c52ff]/20 hover:bg-[#2d1b4e]/80',
+                cardActiveNormal: isDayTime ? 'bg-fuchsia-100 border-secondary/60 shadow-[0_0_25px_rgba(208,153,255,0.4)]' : 'bg-primary/20 border-primary/50 shadow-[0_0_25px_rgba(140,82,255,0.3)]',
+                cardActiveHaram: isDayTime ? 'bg-rose-50 border-rose-300 shadow-[0_0_20px_rgba(244,63,94,0.15)]' : 'bg-rose-900/30 border-rose-500/50 shadow-[0_0_20px_rgba(244,63,94,0.2)]',
+                progressBg: isDayTime ? 'bg-fuchsia-200 border-fuchsia-300' : 'bg-[#1a1128] border-[#8c52ff]/30',
+                border: isDayTime ? 'border-fuchsia-200' : 'border-[#8c52ff]/30',
+                primaryColor: 'primary',
+                secondaryColor: 'secondary'
             };
 
             const timeline = useMemo(() => {
@@ -469,7 +421,7 @@
                     { id: 'dhuha', name: 'Dhuha', start: parseTime(adjustedJadwal.dhuha, 0, base), end: parseTime(adjustedJadwal.dzuhur, 0, base), type: 'sunnah' },
                     { id: 'dzuhur', name: 'Dzuhur', start: parseTime(adjustedJadwal.dzuhur, 0, base), end: parseTime(adjustedJadwal.ashar, 0, base), type: 'wajib' },
                     { id: 'ashar', name: 'Ashar', start: parseTime(adjustedJadwal.ashar, 0, base), end: parseTime(adjustedJadwal.maghrib, 0, base), type: 'wajib' },
-                    { id: 'maghrib', name: 'Maghrib (Ifthor)', start: parseTime(adjustedJadwal.maghrib, 0, base), end: parseTime(adjustedJadwal.isya, 0, base), type: 'wajib' },
+                    { id: 'maghrib', name: 'Maghrib', start: parseTime(adjustedJadwal.maghrib, 0, base), end: parseTime(adjustedJadwal.isya, 0, base), type: 'wajib' },
                     { id: 'isya', name: 'Isya', start: parseTime(adjustedJadwal.isya, 0, base), end: parseTime("23:59:59", 0, base), type: 'wajib' }
                 ];
             }, [adjustedJadwal, cityTimezone]);
@@ -490,21 +442,21 @@
                 if (!adjustedJadwal) return [];
                 return [
                     { title: "Tahajjud", time: "01:00", end: adjustedJadwal.imsak, icon: IconMoon, desc: "Sepertiga malam akhir" },
-                    { title: "Sahur", time: "01:00", end: adjustedJadwal.imsak, icon: IconClock, desc: "Batas akhir Imsak" },
+                    { title: "Sahur / Imsak", time: adjustedJadwal.imsak, end: adjustedJadwal.subuh, icon: IconClock, desc: "Batas waktu sahur" },
                     { title: "Subuh", time: adjustedJadwal.subuh, end: adjustedJadwal.terbit, icon: IconSunrise, desc: "Sholat Wajib" },
                     { title: "Syuruq", time: adjustedJadwal.terbit, end: adjustedJadwal.dhuha, icon: IconSunrise, desc: "Waktu haram sholat", isHaram: true },
                     { title: "Dhuha", time: adjustedJadwal.dhuha, end: adjustedJadwal.dzuhur, icon: IconSun, desc: "Sholat Sunnah" },
                     { title: "Dzuhur", time: adjustedJadwal.dzuhur, end: adjustedJadwal.ashar, icon: IconSun, desc: "Sholat Wajib" },
-                    { title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: IconSunset, desc: "Syafi'i: Bayangan = Benda" },
-                    { title: "Ifthor / Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: IconSunset, desc: "Buka Puasa & Wajib" },
+                    { title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: IconSunset, desc: "Sholat Wajib" },
+                    { title: "Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: IconSunset, desc: "Sholat Wajib" },
                     { title: "Isya", time: adjustedJadwal.isya, end: "00:00", icon: IconCloudMoon, desc: "Sholat Wajib" },
                 ];
             }, [adjustedJadwal]);
 
-            if (!jadwal || loading) {
+            if (loading && !jadwal) {
                 return (
-                    <div className={`flex h-screen items-center justify-center transition-colors duration-500 ${isDayTime ? 'bg-slate-50' : 'bg-slate-900'}`}>
-                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500"></div>
+                    <div className="flex h-screen items-center justify-center bg-fuchsia-50">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
                     </div>
                 );
             }
@@ -512,112 +464,97 @@
             return (
                 <div className={`min-h-screen transition-colors duration-1000 ${theme.bg} ${theme.text} font-sans pb-20 overflow-x-hidden`}>
                     
-                    {/* OVERLAY ALARM TAHAJJUD BERBUNYI */}
+                    {/* OVERLAY TAHAJJUD */}
                     {isTahajjudRinging && (
-                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-xl p-4">
-                            <div className="animate-bounce bg-emerald-500/20 p-6 rounded-full mb-6">
-                                <IconMoon className="w-16 h-16 text-emerald-400" />
+                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#1a1128]/95 backdrop-blur-xl p-4">
+                            <div className="animate-bounce bg-secondary/20 p-6 rounded-full mb-6 shadow-[0_0_40px_rgba(208,153,255,0.4)]">
+                                <IconMoon className="w-16 h-16 text-secondary" />
                             </div>
-                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-3 text-center tracking-tight">Waktu Tahajjud!</h2>
-                            <p className="text-emerald-400 mb-12 text-center text-lg md:text-xl italic max-w-lg">
+                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-3 text-center tracking-tight text-gradient">Waktu Tahajjud!</h2>
+                            <p className="text-fuchsia-200 mb-12 text-center text-lg md:text-xl italic max-w-lg">
                                 "{PRAYER_QUOTES['tahajjud']}"
                             </p>
-                            <button 
-                                onClick={stopTahajjudAlarm}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-10 py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(16,185,129,0.4)] flex items-center gap-3 text-xl font-bold transition-all transform hover:scale-105"
-                            >
+                            <button onClick={() => setIsTahajjudRinging(false)} className="bg-gradient-feminine text-white px-10 py-4 rounded-full shadow-lg flex items-center gap-3 text-xl font-bold hover:scale-105 transition-transform">
                                 <IconSquare className="w-6 h-6" /> Matikan Alarm
                             </button>
                         </div>
                     )}
 
-                    {/* OVERLAY POPUP WAKTU SHOLAT WAJIB */}
+                    {/* OVERLAY ADZAN */}
                     {prayerPopup && (
-                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-xl p-4">
-                            <div className="animate-bounce bg-emerald-500/20 p-6 rounded-full mb-6">
-                                <IconClock className="w-16 h-16 text-emerald-400" />
+                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#1a1128]/95 backdrop-blur-xl p-4">
+                            <div className="animate-bounce bg-primary/20 p-6 rounded-full mb-6 shadow-[0_0_40px_rgba(140,82,255,0.4)]">
+                                <IconClock className="w-16 h-16 text-primary" />
                             </div>
-                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-3 text-center tracking-tight capitalize">Waktu {prayerPopup.name} Tiba!</h2>
-                            <p className="text-emerald-400 mb-12 text-center text-lg md:text-xl italic max-w-lg">
-                                "{PRAYER_QUOTES[prayerPopup.id] || "Marilah kita tunaikan sholat untuk ketenangan hati."}"
+                            <h2 className="text-3xl md:text-5xl font-bold text-white mb-3 text-center tracking-tight capitalize text-gradient">Waktu {prayerPopup.name} Tiba!</h2>
+                            <p className="text-fuchsia-200 mb-12 text-center text-lg md:text-xl italic max-w-lg">
+                                "{PRAYER_QUOTES[prayerPopup.id]}"
                             </p>
-                            <button 
-                                onClick={stopPrayerPopup}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-10 py-4 rounded-full shadow-[0_10px_30px_-5px_rgba(16,185,129,0.4)] flex items-center gap-3 text-lg md:text-xl font-bold transition-all transform hover:scale-105"
-                            >
+                            <button onClick={stopPrayerPopup} className="bg-gradient-feminine text-white px-10 py-4 rounded-full shadow-lg flex items-center gap-3 text-lg md:text-xl font-bold hover:scale-105 transition-transform">
                                 <IconSquare className="w-6 h-6" /> Tutup & Hentikan Suara
                             </button>
                         </div>
                     )}
 
-                    {/* Tombol Stop Mengambang Saat Audio Berbunyi (Jika popup tertutup tapi audio masih jalan) */}
-                    {isPlaying && !prayerPopup && !isTahajjudRinging && (
-                        <div className="fixed bottom-8 left-0 right-0 flex justify-center z-50 px-4 pointer-events-none">
-                            <button 
-                                onClick={toggleAudio}
-                                className="pointer-events-auto bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-full shadow-[0_10px_25px_-5px_rgba(239,68,68,0.5)] flex items-center gap-2 animate-bounce transition-all transform hover:scale-105 font-medium"
-                            >
-                                <IconSquare className="w-5 h-5" /> Hentikan Suara Adzan
-                            </button>
-                        </div>
-                    )}
-
                     <div className="relative pt-8 md:pt-12 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                        <button 
-                            onClick={() => setIsSettingsOpen(true)}
-                            className={`absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full backdrop-blur-md transition-all shadow-lg hover:scale-105 z-20 ${isDayTime ? 'bg-white/80 text-slate-700 hover:bg-emerald-50' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`}
-                        >
+                        <button onClick={() => setIsSettingsOpen(true)} className={`absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full backdrop-blur-md transition-all shadow-lg hover:scale-105 z-20 ${isDayTime ? 'bg-white/90 text-primary hover:bg-fuchsia-100' : 'bg-[#2d1b4e]/80 text-secondary hover:bg-[#2d1b4e]'}`}>
                             <IconSettings className="w-6 h-6" />
                         </button>
 
                         <div className="text-center mb-8 md:mb-10">
                             {userName && (
-                                <p className={`font-semibold mb-2 text-sm md:text-base ${isDayTime ? 'text-emerald-600' : 'text-emerald-400'}`}>
-                                    Assalamu'alaikum, {userName}
+                                <p className={`font-semibold mb-2 text-sm md:text-base ${isDayTime ? 'text-primary' : 'text-secondary'}`}>
+                                    Assalamu'alaikum, {userName} ✨
                                 </p>
                             )}
-                            <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${theme.titleGradient} mb-3 md:mb-4 transition-all duration-500`}>
-                                Jadwal Sholat Interaktif
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gradient mb-3 md:mb-4">
+                                Jadwal Sholat Premium
                             </h1>
                         </div>
 
-                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl p-4 md:p-6 max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 items-center justify-between mb-8 md:mb-12 transition-all duration-500`}>
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500 flex-shrink-0">
+                        {/* PANEL PENCARIAN & JAM */}
+                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl p-4 md:p-6 max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 items-center justify-between mb-8 md:mb-12 border`}>
+                            <form onSubmit={handleSearch} className="flex flex-1 items-center gap-3 w-full sm:w-auto relative group">
+                                <div className="p-3 bg-gradient-feminine rounded-xl text-white flex-shrink-0 shadow-md">
                                     <IconMapPin className="w-6 h-6" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <label className={`block text-xs ${theme.textMuted} mb-1 uppercase tracking-wider font-semibold`}>Lokasi Saat Ini</label>
-                                    <input 
-                                        type="text" list="cities-list" value={searchCity} onChange={handleCityChange}
-                                        className={`w-full ${theme.inputBg} rounded-lg px-3 md:px-4 py-2 focus:outline-none transition-colors duration-300 text-sm md:text-base truncate`}
-                                        placeholder="Ketik nama kota..."
-                                    />
-                                    <datalist id="cities-list">
-                                        {cities.map(city => <option key={city.id} value={city.lokasi}>{city.lokasi}</option>)}
-                                    </datalist>
+                                    <label className={`block text-[10px] sm:text-xs ${theme.textMuted} mb-1 uppercase tracking-wider font-semibold`}>Cari Lokasi / Kota</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="text" value={searchCityInput} onChange={(e) => setSearchCityInput(e.target.value)}
+                                            className={`w-full ${theme.inputBg} rounded-lg pl-3 pr-10 py-2 focus:outline-none transition-colors border text-sm md:text-base`}
+                                            placeholder="Cth: Jakarta, Makkah..."
+                                        />
+                                        <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-primary hover:text-secondary transition-colors">
+                                            <IconSearch className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="text-center sm:text-right w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-slate-300/20 pt-3 sm:pt-0">
-                                <div className={`text-xs md:text-sm ${theme.textMuted} font-medium`}>{displayDate}</div>
+                            </form>
+                            
+                            <div className="text-center sm:text-right w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-fuchsia-500/20 pt-3 sm:pt-0">
+                                <div className={`text-xs md:text-sm ${theme.textMuted} font-medium capitalize`}>{displayDate}</div>
                                 <div className="text-2xl sm:text-3xl font-mono font-bold tracking-widest mt-0 sm:mt-1 flex items-baseline">
                                     {formatTimeDisplay(currentTime.getHours(), currentTime.getMinutes())}
-                                    <span className="text-sm sm:text-lg text-emerald-500 ml-1">:{currentTime.getSeconds().toString().padStart(2, '0')}</span>
-                                    <span className={`text-xs sm:text-sm ${theme.textMuted} ml-2 font-sans tracking-normal font-semibold`}>{tzLabel}</span>
+                                    <span className={`text-sm sm:text-lg text-${theme.primaryColor} ml-1`}>:{currentTime.getSeconds().toString().padStart(2, '0')}</span>
                                 </div>
+                                <div className={`text-[10px] ${theme.textMuted} mt-1 max-w-[150px] truncate`}>{activeCity} ({cityTimezone})</div>
                             </div>
                         </div>
 
-                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl md:rounded-3xl p-6 md:p-8 max-w-4xl mx-auto text-center relative overflow-hidden transition-all duration-500`}>
-                            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        {/* MAIN COUNTDOWN PANEL */}
+                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl md:rounded-3xl p-6 md:p-8 max-w-4xl mx-auto text-center relative overflow-hidden border`}>
+                            {/* Decorative Blobs */}
+                            <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+                            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
 
                             <div className="relative z-10">
-                                <h2 className={`text-lg md:text-xl font-medium mb-1 ${isDayTime ? 'text-slate-600' : 'text-slate-300'}`}>
-                                    Saat ini: <span className="text-emerald-500 font-bold">{currentPhase?.name}</span>
+                                <h2 className={`text-lg md:text-xl font-medium mb-1 ${theme.text}`}>
+                                    Saat ini: <span className="text-gradient font-bold">{currentPhase?.name}</span>
                                 </h2>
                                 
-                                <p className={`text-sm md:text-base italic mb-4 md:mb-6 px-4 max-w-xl mx-auto opacity-90 transition-colors duration-500 ${isDayTime ? 'text-slate-500' : 'text-slate-400'}`}>
+                                <p className={`text-sm md:text-base italic mb-4 md:mb-6 px-4 max-w-xl mx-auto opacity-90 ${theme.textMuted}`}>
                                     "{PRAYER_QUOTES[currentPhase?.id] || "Tegakkan sholat, raihlah ketenangan hati."}"
                                 </p>
 
@@ -630,7 +567,7 @@
                                         const iqomahRemaining = (qomatMins * 60 * 1000) - timeElapsed;
                                         return (
                                             <div className="mb-4 md:mb-6">
-                                                <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tracking-tighter text-amber-500 mb-2 drop-shadow-sm flex items-center justify-center animate-pulse">
+                                                <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tracking-tighter text-secondary mb-2 drop-shadow-sm flex items-center justify-center animate-pulse">
                                                     Menuju Iqomah: -{formatDuration(iqomahRemaining)}
                                                 </div>
                                                 <div className={`text-sm sm:text-lg font-medium tracking-tight ${theme.textMuted} flex items-center justify-center`}>
@@ -641,25 +578,25 @@
                                     }
                                     return (
                                         <div className="text-5xl sm:text-7xl md:text-8xl font-bold font-mono tracking-tighter mb-4 md:mb-6 drop-shadow-sm flex items-center justify-center">
-                                            <span className={theme.textMuted}>-</span>{formatDuration(timeRemaining)}
+                                            <span className="opacity-50 mr-2 text-3xl md:text-5xl font-sans">-</span>{formatDuration(timeRemaining)}
                                         </div>
                                     );
                                 })()}
 
                                 <p className={`text-sm sm:text-base md:text-lg ${theme.textMuted} mb-6 md:mb-8`}>
-                                    Menuju <strong className={theme.text}>{nextPhase?.name}</strong> pada pukul {nextPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
+                                    Menuju <strong className={`text-${theme.primaryColor}`}>{nextPhase?.name}</strong> pada pukul {nextPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
                                 </p>
 
                                 <div className="w-full max-w-2xl mx-auto group">
                                     <div className={`flex justify-between text-xs md:text-sm ${theme.textMuted} mb-2 px-1 font-medium`}>
                                         <span>Mulai: {currentPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                                        <span className="text-emerald-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                            <IconInfo className="w-3 h-3 md:w-4 md:h-4" /> Berjalan {formatDuration(timeElapsed)}
+                                        <span className={`text-${theme.primaryColor} opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-1`}>
+                                            <IconInfo className="w-3 h-3" /> Berjalan {formatDuration(timeElapsed)}
                                         </span>
                                         <span>Selesai: {currentPhase?.end.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                     </div>
-                                    <div className={`h-4 md:h-6 w-full ${theme.progressBg} rounded-full overflow-hidden relative shadow-inner border transition-colors duration-500`}>
-                                        <div className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-red-500 to-red-400' : currentPhase?.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`} style={{ width: `${progress}%` }}>
+                                    <div className={`h-4 md:h-6 w-full ${theme.progressBg} rounded-full overflow-hidden relative shadow-inner border`}>
+                                        <div className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-rose-500 to-rose-400' : 'bg-gradient-feminine'}`} style={{ width: `${progress}%` }}>
                                             <div className="absolute right-0 top-0 bottom-0 w-3 md:w-4 bg-white/40 blur-[2px]"></div>
                                         </div>
                                     </div>
@@ -667,217 +604,202 @@
                             </div>
                         </div>
 
+                        {/* CARDS GRID */}
                         <div className="mt-10 md:mt-16">
-                            <h3 className={`text-xl md:text-2xl font-bold mb-6 md:mb-8 text-center border-b ${theme.border} pb-3 md:pb-4 max-w-[200px] md:max-w-xs mx-auto transition-colors duration-500`}>
+                            <h3 className={`text-xl md:text-2xl font-bold mb-6 md:mb-8 text-center border-b ${theme.border} pb-3 md:pb-4 max-w-[200px] md:max-w-xs mx-auto text-gradient`}>
                                 Jadwal Lengkap
                             </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
-                                {cardsData.map((card, idx) => {
-                                    let isActive = false;
-                                    if (currentPhase) {
-                                        if (card.title === "Tahajjud" && currentPhase.id === 'tahajjud') isActive = true;
-                                        if (card.title === "Sahur" && currentPhase.id === 'tahajjud') isActive = true; 
-                                        if (card.title.includes("Subuh") && currentPhase.id === 'subuh') isActive = true;
-                                        if (card.title.includes("Syuruq") && currentPhase.id === 'syuruq') isActive = true;
-                                        if (card.title.includes("Dhuha") && currentPhase.id === 'dhuha') isActive = true;
-                                        if (card.title.includes("Dzuhur") && currentPhase.id === 'dzuhur') isActive = true;
-                                        if (card.title.includes("Ashar") && currentPhase.id === 'ashar') isActive = true;
-                                        if (card.title.includes("Ifthor") && currentPhase.id === 'maghrib') isActive = true;
-                                        if (card.title.includes("Isya") && currentPhase.id === 'isya') isActive = true;
-                                    }
+                            {loading ? (
+                                <div className="text-center py-10 opacity-50"><div className="animate-spin inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div></div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+                                    {cardsData.map((card, idx) => {
+                                        let isActive = false;
+                                        if (currentPhase) {
+                                            if (card.title === "Tahajjud" && currentPhase.id === 'tahajjud') isActive = true;
+                                            if (card.title.includes("Sahur") && currentPhase.id === 'imsak') isActive = true; 
+                                            if (card.title === "Subuh" && currentPhase.id === 'subuh') isActive = true;
+                                            if (card.title === "Syuruq" && currentPhase.id === 'syuruq') isActive = true;
+                                            if (card.title === "Dhuha" && currentPhase.id === 'dhuha') isActive = true;
+                                            if (card.title === "Dzuhur" && currentPhase.id === 'dzuhur') isActive = true;
+                                            if (card.title === "Ashar" && currentPhase.id === 'ashar') isActive = true;
+                                            if (card.title === "Maghrib" && currentPhase.id === 'maghrib') isActive = true;
+                                            if (card.title === "Isya" && currentPhase.id === 'isya') isActive = true;
+                                        }
 
-                                    const activeStyle = card.isHaram ? theme.cardActiveHaram : theme.cardActiveNormal;
-                                    const defaultStyle = theme.card;
-                                    const IconComponent = card.icon;
-
-                                    return (
-                                        <div key={idx} className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${isActive ? `${activeStyle} sm:scale-105 z-10` : `${defaultStyle}`}`}>
-                                            {isActive && (
-                                                <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
-                                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-red-400' : 'bg-emerald-400'} opacity-75`}></span>
-                                                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 md:h-3 md:w-3 ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                                                </span>
-                                            )}
-                                            
-                                            <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${isActive ? (card.isHaram ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600') : `bg-slate-200/50 ${theme.textMuted}`}`}>
-                                                <IconComponent className="w-5 h-5 md:w-6 md:h-6" />
-                                            </div>
-                                            
-                                            <h4 className={`text-sm md:text-lg font-semibold mb-1 transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-900' : 'text-white') : theme.text}`}>{card.title}</h4>
-                                            <div className="flex items-end gap-2 mb-1 md:mb-2">
-                                                <span className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-800' : 'text-slate-100') : theme.text}`}>{card.time}</span>
-                                            </div>
-                                            
-                                            {isActive && (
-                                                <div className="absolute bottom-0 left-0 h-1 md:h-1.5 bg-slate-200 dark:bg-slate-700 w-full transition-colors duration-500">
-                                                    <div className={`h-full ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${progress}%`}}></div>
+                                        const activeStyle = card.isHaram ? theme.cardActiveHaram : theme.cardActiveNormal;
+                                        
+                                        return (
+                                            <div key={idx} className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${isActive ? `${activeStyle} sm:scale-105 z-10` : `${theme.card}`}`}>
+                                                {isActive && (
+                                                    <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
+                                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-rose-400' : 'bg-secondary'} opacity-75`}></span>
+                                                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 md:h-3 md:w-3 ${card.isHaram ? 'bg-rose-500' : 'bg-primary'}`}></span>
+                                                    </span>
+                                                )}
+                                                
+                                                <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${isActive ? (card.isHaram ? 'bg-rose-500/20 text-rose-500' : 'bg-gradient-feminine text-white shadow-md') : `bg-fuchsia-500/10 ${theme.textMuted}`}`}>
+                                                    <card.icon className="w-5 h-5 md:w-6 md:h-6" />
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                                
+                                                <h4 className={`text-sm md:text-lg font-semibold mb-1 transition-colors duration-500 ${isActive ? (isDayTime ? 'text-primary' : 'text-fuchsia-100') : theme.text}`}>{card.title}</h4>
+                                                <div className="flex items-end gap-2 mb-1 md:mb-2">
+                                                    <span className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-800' : 'text-white') : theme.text}`}>{card.time}</span>
+                                                </div>
+                                                
+                                                {isActive && (
+                                                    <div className="absolute bottom-0 left-0 h-1 md:h-1.5 bg-black/5 w-full">
+                                                        <div className={`h-full ${card.isHaram ? 'bg-rose-500' : 'bg-gradient-feminine'}`} style={{width: `${progress}%`}}></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
-                        {/* Modal Pengaturan Terpusat */}
+                        {/* MODAL SETTINGS TEMA FEMINIM */}
                         {isSettingsOpen && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                                <div className={`${theme.panel} w-full max-w-lg rounded-2xl md:rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto relative shadow-2xl transition-all`}>
-                                    <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-4 right-4 p-2 rounded-full hover:bg-slate-500/20 transition-colors ${theme.text}`}>
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1128]/80 backdrop-blur-sm p-4">
+                                <div className={`${theme.panel} border w-full max-w-2xl rounded-2xl md:rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto relative shadow-2xl`}>
+                                    <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-4 right-4 p-2 rounded-full hover:bg-fuchsia-500/20 transition-colors ${theme.text}`}>
                                         <IconX className="w-6 h-6" />
                                     </button>
 
-                                    <h2 className={`text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 ${theme.text}`}>
-                                        <IconSettings className="w-6 h-6 text-emerald-500" /> Pengaturan Aplikasi
+                                    <h2 className={`text-xl md:text-2xl font-bold mb-6 flex items-center gap-3 text-gradient border-b ${theme.border} pb-4`}>
+                                        <IconSettings className="w-7 h-7 text-primary" /> Pengaturan Profesional
                                     </h2>
 
-                                    {/* IDENTITAS PENGGUNA */}
-                                    <div className="mb-6">
-                                        <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}>
-                                            <IconUser className="w-4 h-4 text-emerald-500" /> Sapaan Personal
-                                        </h3>
-                                        <input 
-                                            type="text" 
-                                            value={userName} 
-                                            onChange={(e) => {
-                                                setUserName(e.target.value);
-                                                saveSetting('sholat_user_name', e.target.value);
-                                            }}
-                                            className={`w-full ${theme.inputBg} rounded-md px-3 py-2 border ${theme.border} focus:outline-none focus:border-emerald-500 text-sm`}
-                                            placeholder="Masukkan nama Anda..."
-                                        />
-                                    </div>
-
-                                    <div className={`mb-6 p-4 rounded-xl border ${theme.border} bg-slate-500/5`}>
-                                        <div className="flex justify-between items-center mb-4">
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        {/* KOLOM KIRI: Identitas & API */}
+                                        <div className="space-y-6">
                                             <div>
-                                                <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
-                                                    {audioEnabled ? <IconVolume2 className="w-5 h-5 text-emerald-500" /> : <IconVolumeX className="w-5 h-5 text-red-500" />}
-                                                    Suara Adzan
-                                                </h3>
-                                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu sholat</p>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
-                                                    const val = e.target.checked;
-                                                    setAudioEnabled(val);
-                                                    saveSetting('sholat_audio', val);
-                                                }} />
-                                                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                            </label>
-                                        </div>
-                                        
-                                        <div className="mb-3 text-[10px] opacity-70 p-2 bg-black/10 rounded font-mono break-all">
-                                            Status: {audioStatus}
-                                        </div>
-
-                                        {/* TOMBOL TEST / PAUSE AUDIO */}
-                                        <button 
-                                            onClick={toggleAudio} 
-                                            className={`w-full flex items-center justify-center gap-2 ${isPlaying ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600'} text-white py-2 rounded-lg text-sm font-medium transition-colors`}
-                                        >
-                                            {isPlaying ? <IconSquare className="w-4 h-4" /> : <IconPlay className="w-4 h-4" />} 
-                                            {isPlaying ? "Hentikan Suara" : "Test Suara Adzan"}
-                                        </button>
-                                    </div>
-
-                                    {/* ALARM BANGUN MALAM (TAHAJJUD) */}
-                                    <div className={`mb-6 p-4 rounded-xl border ${theme.border} bg-slate-500/5`}>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <div>
-                                                <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
-                                                    <IconMoon className="w-5 h-5 text-emerald-500" />
-                                                    Alarm Tahajjud
-                                                </h3>
-                                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Pengingat khusus bangun malam</p>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" className="sr-only peer" checked={tahajjudAlarmEnabled} onChange={(e) => {
-                                                    setTahajjudAlarmEnabled(e.target.checked);
-                                                    saveSetting('sholat_tahajjud_enabled', e.target.checked);
-                                                }} />
-                                                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                            </label>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <label className={`block text-[10px] md:text-xs ${theme.textMuted} mb-1 font-semibold`}>Jam Dering Alarm</label>
-                                            <input 
-                                                type="time" 
-                                                value={tahajjudAlarmTime} 
-                                                onChange={(e) => {
-                                                    setTahajjudAlarmTime(e.target.value);
-                                                    saveSetting('sholat_tahajjud_time', e.target.value);
-                                                }}
-                                                className={`w-full ${theme.inputBg} rounded-md px-3 py-2 border ${theme.border} focus:outline-none focus:border-emerald-500 text-sm`}
-                                            />
-                                        </div>
-
-                                        <div className="mb-2">
-                                            <label className={`block text-[10px] md:text-xs ${theme.textMuted} mb-1 font-semibold`}>Audio Khusus (Maks 4MB)</label>
-                                            <div className="flex gap-2">
+                                                <h3 className={`font-semibold ${theme.text} mb-2 flex items-center gap-2 text-sm md:text-base`}><IconUser className="w-4 h-4 text-primary" /> Sapaan Personal</h3>
                                                 <input 
-                                                    type="file" 
-                                                    accept="audio/mpeg, audio/mp3" 
-                                                    onChange={handleTahajjudUpload}
-                                                    className={`w-full ${theme.inputBg} rounded-md px-2 py-1.5 border ${theme.border} text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer`}
+                                                    type="text" value={userName} 
+                                                    onChange={(e) => { setUserName(e.target.value); saveSetting('sholat_user_name', e.target.value); }}
+                                                    className={`w-full ${theme.inputBg} rounded-lg px-4 py-2.5 border text-sm`}
                                                 />
                                             </div>
-                                            {tahajjudCustomAudio && (
-                                                <button onClick={removeCustomTahajjud} className="text-[10px] text-red-500 mt-1.5 hover:underline font-medium">
-                                                    [x] Hapus Audio Custom (Pakai Default)
+
+                                            <div className={`p-4 rounded-xl border ${theme.border} bg-fuchsia-500/5`}>
+                                                <h3 className={`font-semibold ${theme.text} mb-4 flex items-center gap-2 text-sm md:text-base`}><IconCompass className="w-4 h-4 text-primary" /> Metode Penghitungan</h3>
+                                                
+                                                <div className="mb-4">
+                                                    <label className={`block text-xs ${theme.textMuted} mb-1.5`}>Metode Utama (Subuh, Isya, dll)</label>
+                                                    <select 
+                                                        value={calcMethod} 
+                                                        onChange={(e) => { setCalcMethod(e.target.value); saveSetting('sholat_calc_method', e.target.value); }}
+                                                        className={`w-full ${theme.inputBg} rounded-lg px-3 py-2 border text-sm font-medium`}
+                                                    >
+                                                        <option value="20">Kemenag RI (Indonesia)</option>
+                                                        <option value="3">Muslim World League (MWL)</option>
+                                                        <option value="5">Egyptian General Authority of Survey</option>
+                                                        <option value="2">Islamic Society of North America (ISNA)</option>
+                                                        <option value="0">Shia Ithna-Ashari (Leva, Qum)</option>
+                                                        <option value="1">University of Islamic Sciences, Karachi</option>
+                                                        <option value="4">Umm Al-Qura University, Makkah</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className={`block text-xs ${theme.textMuted} mb-1.5`}>Metode Asar</label>
+                                                    <select 
+                                                        value={asrMethod} 
+                                                        onChange={(e) => { setAsrMethod(e.target.value); saveSetting('sholat_asr_method', e.target.value); }}
+                                                        className={`w-full ${theme.inputBg} rounded-lg px-3 py-2 border text-sm font-medium`}
+                                                    >
+                                                        <option value="0">Mazhab Syafii, Maliki, Hambali (Standar)</option>
+                                                        <option value="1">Mazhab Hanafi (Bayangan 2x Lipat)</option>
+                                                    </select>
+                                                </div>
+                                                <p className={`text-[10px] mt-2 ${theme.textMuted} italic`}>*Perubahan metode akan memuat ulang jadwal secara otomatis.</p>
+                                            </div>
+                                        </div>
+
+                                        {/* KOLOM KANAN: Alarm & Audio */}
+                                        <div className="space-y-6">
+                                            <div className={`p-4 rounded-xl border ${theme.border} bg-fuchsia-500/5`}>
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <div>
+                                                        <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
+                                                            {audioEnabled ? <IconVolume2 className="w-5 h-5 text-primary" /> : <IconVolumeX className="w-5 h-5 text-rose-500" />} Suara Adzan
+                                                        </h3>
+                                                    </div>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => { setAudioEnabled(e.target.checked); saveSetting('sholat_audio', e.target.checked); }} />
+                                                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                                    </label>
+                                                </div>
+                                                <button onClick={toggleAudio} className={`w-full flex items-center justify-center gap-2 ${isPlaying ? 'bg-rose-500 hover:bg-rose-600' : 'bg-primary hover:bg-secondary'} text-white py-2 rounded-lg text-sm font-medium transition-colors`}>
+                                                    {isPlaying ? <IconSquare className="w-4 h-4" /> : <IconPlay className="w-4 h-4" />} {isPlaying ? "Hentikan" : "Test Suara"}
                                                 </button>
-                                            )}
-                                        </div>
+                                            </div>
 
-                                        <button 
-                                            onClick={testTahajjudAudio} 
-                                            className="w-full mt-3 flex items-center justify-center gap-2 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white py-2 rounded-lg text-xs font-medium transition-colors"
-                                        >
-                                            <IconPlay className="w-3 h-3" /> Test Suara Alarm (13 Detik)
-                                        </button>
-                                    </div>
-
-                                    <div className="mb-6">
-                                        <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconClock className="w-4 h-4"/> Jeda Waktu Iqomah (Menit)</h3>
-                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                            {['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
-                                                <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
-                                                    <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
-                                                    <input 
-                                                        type="number" min="0" value={qomatDurations[key]} 
-                                                        onChange={(e) => {
-                                                            const newQomat = {...qomatDurations, [key]: Math.max(0, parseInt(e.target.value) || 0)};
-                                                            setQomatDurations(newQomat);
-                                                            saveSetting('sholat_qomat', newQomat);
-                                                        }}
-                                                        className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
-                                                    />
+                                            <div className={`p-4 rounded-xl border ${theme.border} bg-fuchsia-500/5`}>
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}><IconMoon className="w-5 h-5 text-secondary" /> Alarm Tahajjud</h3>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input type="checkbox" className="sr-only peer" checked={tahajjudAlarmEnabled} onChange={(e) => { setTahajjudAlarmEnabled(e.target.checked); saveSetting('sholat_tahajjud_enabled', e.target.checked); }} />
+                                                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                                    </label>
                                                 </div>
-                                            ))}
+                                                <input 
+                                                    type="time" value={tahajjudAlarmTime} 
+                                                    onChange={(e) => { setTahajjudAlarmTime(e.target.value); saveSetting('sholat_tahajjud_time', e.target.value); }}
+                                                    className={`w-full mb-3 ${theme.inputBg} rounded-md px-3 py-2 border text-sm`}
+                                                />
+                                                <input 
+                                                    type="file" accept="audio/*" onChange={handleTahajjudUpload}
+                                                    className={`w-full ${theme.inputBg} rounded-md px-2 py-1.5 border text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-fuchsia-100 file:text-primary cursor-pointer`}
+                                                />
+                                            </div>
                                         </div>
+                                    </div>
+                                    
+                                    {/* BOTTOM: Koreksi Waktu */}
+                                    <div className="mt-6 border-t border-fuchsia-500/20 pt-6">
+                                        <details className="group">
+                                            <summary className={`font-semibold ${theme.text} cursor-pointer list-none flex items-center justify-between text-sm md:text-base p-2 hover:bg-fuchsia-500/5 rounded-lg`}>
+                                                <span className="flex items-center gap-2"><IconClock className="w-4 h-4 text-primary"/> Koreksi Manual & Timer Iqomah</span>
+                                                <span className="transition group-open:rotate-180">▼</span>
+                                            </summary>
+                                            <div className="grid md:grid-cols-2 gap-6 mt-4 p-2">
+                                                <div>
+                                                    <h4 className={`text-xs font-semibold ${theme.textMuted} mb-3`}>Koreksi Jadwal (Menit +/-)</h4>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
+                                                            <div key={key} className={`flex items-center justify-between p-2 rounded-lg border ${theme.border} bg-fuchsia-500/5`}>
+                                                                <span className={`text-[10px] md:text-xs capitalize font-medium ${theme.text}`}>{key}</span>
+                                                                <input 
+                                                                    type="number" value={offsets[key]} 
+                                                                    onChange={(e) => { const newOff = {...offsets, [key]: parseInt(e.target.value)||0}; setOffsets(newOff); saveSetting('sholat_offsets', newOff); }}
+                                                                    className={`w-12 p-1 text-center rounded border ${theme.inputBg} text-xs font-bold`}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className={`text-xs font-semibold ${theme.textMuted} mb-3`}>Jeda Iqomah (Menit)</h4>
+                                                    <div className="grid grid-cols-1 gap-2">
+                                                        {['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
+                                                            <div key={key} className={`flex items-center justify-between p-2 rounded-lg border ${theme.border} bg-fuchsia-500/5`}>
+                                                                <span className={`text-[10px] md:text-xs capitalize font-medium ${theme.text}`}>{key}</span>
+                                                                <input 
+                                                                    type="number" min="0" value={qomatDurations[key]} 
+                                                                    onChange={(e) => { const newQmt = {...qomatDurations, [key]: Math.max(0, parseInt(e.target.value)||0)}; setQomatDurations(newQmt); saveSetting('sholat_qomat', newQmt); }}
+                                                                    className={`w-16 p-1 text-center rounded border ${theme.inputBg} text-xs font-bold`}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </details>
                                     </div>
 
-                                    <div className="mb-2">
-                                        <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconSettings className="w-4 h-4"/> Koreksi Jadwal (Menit)</h3>
-                                        <div className="grid grid-cols-2 gap-2 md:gap-3 mt-3">
-                                            {['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
-                                                <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
-                                                    <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
-                                                    <input 
-                                                        type="number" value={offsets[key]} 
-                                                        onChange={(e) => {
-                                                            const val = parseInt(e.target.value);
-                                                            const newOffsets = {...offsets, [key]: isNaN(val) ? 0 : val};
-                                                            setOffsets(newOffsets);
-                                                            saveSetting('sholat_offsets', newOffsets);
-                                                        }}
-                                                        className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         )}
