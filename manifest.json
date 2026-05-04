@@ -1,7 +1,7 @@
 {
   "name": "Shalat Reminder",
   "short_name": "App Web",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0ea5e9",
