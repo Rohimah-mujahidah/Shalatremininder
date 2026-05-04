@@ -1,602 +1,592 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Moon, Sunrise, Sun, Sunset, CloudMoon, Clock, MapPin, Info, Settings as SettingsIcon, Volume2, VolumeX, X } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jadwal Sholat Interaktif</title>
 
-// --- Fungsi Bantuan / Utility ---
-const formatTimeDisplay = (hours, minutes) => {
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-};
+    <!-- 1. Menghubungkan Web App Manifest untuk PWA -->
+    <link rel="manifest" href="manifest.json">
 
-const parseTime = (timeStr, offsetDay = 0, baseDate = new Date()) => {
-    if (!timeStr) return baseDate;
-    const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number);
-    const d = new Date(baseDate.getTime());
-    d.setHours(hours, minutes, seconds, 0);
-    if (offsetDay !== 0) {
-        d.setDate(d.getDate() + offsetDay);
-    }
-    return d;
-};
-
-const formatDuration = (ms) => {
-    if (ms < 0) ms = 0;
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-};
-
-// Fungsi Penyesuaian Waktu Manual (Offset)
-const adjustTimeString = (timeStr, offsetMinutes) => {
-    if (!timeStr) return timeStr;
-    const [h, m] = timeStr.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m + (offsetMinutes || 0), 0, 0);
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-};
-
-// Fungsi Penentu Zona Waktu Kota
-const getCityTimeZone = (cityName) => {
-    const name = cityName.toUpperCase();
-    if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; // WIT
-    if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar"; // WITA
-    return "Asia/Jakarta"; // WIB
-};
-
-// Fungsi Mendapatkan Waktu Real Sesuai Zona
-const getLocalTime = (tz) => {
-    try {
-        return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-    } catch (e) {
-        return new Date();
-    }
-};
-
-const getInitialDateStr = (tz) => {
-    const d = getLocalTime(tz);
-    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-};
-
-// Fungsi aman untuk mengambil localStorage
-const safeGetItem = (key, defaultValue) => {
-    try {
-        const item = localStorage.getItem(key);
-        return item !== null ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-        return defaultValue;
-    }
-};
-
-export default function App() {
-    const [cities, setCities] = useState([]);
+    <!-- 2. Pengaturan Meta Tags Mobile -->
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Jadwal Sholat">
     
-    // Inisialisasi State dari Local Storage
-    const [searchCity, setSearchCity] = useState(() => { try { return localStorage.getItem('sholat_city_name') || "KOTA JAKARTA"; } catch(e){ return "KOTA JAKARTA"; }});
-    const [selectedCityId, setSelectedCityId] = useState(() => { try { return localStorage.getItem('sholat_city_id') || "1301"; } catch(e){ return "1301"; }});
-    const [cityTimezone, setCityTimezone] = useState(() => { try { return localStorage.getItem('sholat_city_tz') || "Asia/Jakarta"; } catch(e){ return "Asia/Jakarta"; }});
-    const [jadwal, setJadwal] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [currentTime, setCurrentTime] = useState(getLocalTime(cityTimezone));
-    const [currentDateStr, setCurrentDateStr] = useState(() => getInitialDateStr(cityTimezone));
+    <!-- 3. Favicon & Apple Touch Icon (Pastikan path file ini benar di repo Anda) -->
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
 
-    // State Pengaturan (Settings)
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
-    const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
-    const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-    const playedAdzanRef = useRef(null);
-    const adzanAudioRef = useRef(null);
+    <!-- React & ReactDOM (Production) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel untuk kompilasi JSX di browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    // Inisialisasi Audio
-    useEffect(() => {
-        adzanAudioRef.current = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/30/Adzan_of_Masjid_Al_Haram.ogg');
-    }, []);
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        /* Smooth Scrollbar custom */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-50 overflow-x-hidden">
+    <div id="root"></div>
 
-    // Simpan pengaturan ke localStorage
-    const saveSetting = (key, value) => {
-        try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("Local storage error"); }
-    };
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
 
-    // Buat Jadwal yang Disesuaikan (Adjusted Jadwal berdasarkan Offset)
-    const adjustedJadwal = useMemo(() => {
-        if (!jadwal) return null;
-        return {
-            ...jadwal,
-            imsak: adjustTimeString(jadwal.imsak, offsets.imsak),
-            subuh: adjustTimeString(jadwal.subuh, offsets.subuh),
-            terbit: adjustTimeString(jadwal.terbit, offsets.terbit),
-            dhuha: adjustTimeString(jadwal.dhuha, offsets.dhuha),
-            dzuhur: adjustTimeString(jadwal.dzuhur, offsets.dzuhur),
-            ashar: adjustTimeString(jadwal.ashar, offsets.ashar),
-            maghrib: adjustTimeString(jadwal.maghrib, offsets.maghrib),
-            isya: adjustTimeString(jadwal.isya, offsets.isya),
+        // --- Definisi Ikon SVG Mandiri (Menggantikan Library External agar lebih ringan) ---
+        const IconMoon = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
+        const IconSunrise = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6"/><path d="M8.4 10.4 4.2 6.2"/><path d="M15.6 10.4l4.2-4.2"/><path d="M22 18h-2"/><path d="M4 18H2"/><path d="M12 14v4"/><path d="M8 22h8"/></svg>;
+        const IconSun = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
+        const IconSunset = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10v4"/><path d="M8.4 15.6 4.2 19.8"/><path d="M15.6 15.6l4.2 4.2"/><path d="M22 12h-2"/><path d="M4 12H2"/><path d="M12 2v4"/><path d="M8 22h8"/></svg>;
+        const IconCloudMoon = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 16a3 3 0 1 1 0-6H7a5 5 0 1 0 0 10h6a3 3 0 0 0 0-6Z"/><path d="M10.1 9.3a6 6 0 0 1 9.4 4.5"/></svg>;
+        const IconClock = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
+        const IconMapPin = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>;
+        const IconInfo = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
+        const IconSettings = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>;
+        const IconVolume2 = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>;
+        const IconVolumeX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
+        const IconX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+
+
+        // --- Fungsi Bantuan / Utility ---
+        const formatTimeDisplay = (hours, minutes) => {
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         };
-    }, [jadwal, offsets]);
 
-    // Detak Waktu Real-time Sesuai Zona Waktu Kota & Notifikasi Adzan
-    useEffect(() => {
-        const timer = setInterval(() => {
-            const now = getLocalTime(cityTimezone);
-            setCurrentTime(now);
-
-            // Cek pergantian hari (jam 00:00) untuk perbarui jadwal otomatis
-            const newDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
-            setCurrentDateStr(prev => {
-                if (prev !== newDateStr) return newDateStr;
-                return prev;
-            });
-
-            // Cek Waktu Adzan
-            if (adjustedJadwal && audioEnabled) {
-                const currentHHMM = formatTimeDisplay(now.getHours(), now.getMinutes());
-                const isWajibAdzan = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].find(
-                    key => adjustedJadwal[key] === currentHHMM
-                );
-                
-                // Pastikan adzan berbunyi tepat di detik 0 agar tidak berulang
-                if (isWajibAdzan && now.getSeconds() === 0 && playedAdzanRef.current !== `${adjustedJadwal.tanggal}-${isWajibAdzan}`) {
-                    playedAdzanRef.current = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
-                    if (adzanAudioRef.current) {
-                        adzanAudioRef.current.currentTime = 0;
-                        adzanAudioRef.current.play().catch(e => console.log('Autoplay blocked by browser:', e));
-                    }
-                }
+        const parseTime = (timeStr, offsetDay = 0, baseDate = new Date()) => {
+            if (!timeStr) return baseDate;
+            const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number);
+            const d = new Date(baseDate.getTime());
+            d.setHours(hours, minutes, seconds, 0);
+            if (offsetDay !== 0) {
+                d.setDate(d.getDate() + offsetDay);
             }
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [cityTimezone, adjustedJadwal, audioEnabled]);
-
-    // Mengambil Data Kota
-    useEffect(() => {
-        fetch('https://api.myquran.com/v2/sholat/kota/semua')
-            .then(res => res.json())
-            .then(data => {
-                if (data.status) {
-                    setCities(data.data);
-                }
-            })
-            .catch(err => console.error("Gagal mengambil kota", err));
-    }, []);
-
-    // Mengambil Jadwal ketika ID Kota Berubah atau Berganti Hari
-    useEffect(() => {
-        if (!selectedCityId || !currentDateStr) return;
-        setLoading(true);
-
-        fetch(`https://api.myquran.com/v2/sholat/jadwal/${selectedCityId}/${currentDateStr}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.status) {
-                    setJadwal(data.data.jadwal);
-                }
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("Gagal mengambil jadwal", err);
-                setLoading(false);
-            });
-    }, [selectedCityId, currentDateStr]);
-
-    // Handle Pencarian Kota
-    const handleCityChange = (e) => {
-        const val = e.target.value;
-        setSearchCity(val);
-        const found = cities.find(c => c.lokasi === val);
-        if (found) {
-            setSelectedCityId(found.id);
-            const tz = getCityTimeZone(found.lokasi);
-            setCityTimezone(tz);
-            setCurrentTime(getLocalTime(tz)); 
-            setCurrentDateStr(getInitialDateStr(tz));
-            
-            try {
-                localStorage.setItem('sholat_city_name', found.lokasi);
-                localStorage.setItem('sholat_city_id', found.id);
-                localStorage.setItem('sholat_city_tz', tz);
-            } catch (err) { console.warn(err); }
-        }
-    };
-
-    // Logika Tema Siang & Malam Otomatis
-    const isDayTime = useMemo(() => {
-        if (!adjustedJadwal) return true;
-        const base = getLocalTime(cityTimezone);
-        const terbit = parseTime(adjustedJadwal.terbit, 0, base);
-        const maghrib = parseTime(adjustedJadwal.maghrib, 0, base);
-        return currentTime >= terbit && currentTime < maghrib;
-    }, [currentTime, adjustedJadwal, cityTimezone]);
-
-    const tzLabel = useMemo(() => {
-        if (cityTimezone === "Asia/Jayapura") return "WIT";
-        if (cityTimezone === "Asia/Makassar") return "WITA";
-        return "WIB";
-    }, [cityTimezone]);
-
-    const displayDate = useMemo(() => {
-        try {
-            return new Intl.DateTimeFormat('id-ID', {
-                timeZone: cityTimezone,
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-            }).format(new Date());
-        } catch (e) {
-            return jadwal?.tanggal || "";
-        }
-    }, [currentDateStr, cityTimezone, jadwal]);
-
-    // Konfigurasi Tema Tailwind Dinamis
-    const theme = {
-        bg: isDayTime ? 'bg-slate-50' : 'bg-slate-900',
-        text: isDayTime ? 'text-slate-800' : 'text-slate-50',
-        textMuted: isDayTime ? 'text-slate-500' : 'text-slate-400',
-        panel: isDayTime ? 'bg-white/80 border-slate-200 shadow-xl' : 'bg-slate-800/70 border-white/10 shadow-2xl',
-        inputBg: isDayTime ? 'bg-slate-50 border-slate-300 focus:border-emerald-500 text-slate-800' : 'bg-slate-900/50 border-slate-700 focus:border-emerald-500 text-white',
-        card: isDayTime ? 'bg-white border-slate-200 hover:shadow-md' : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800',
-        cardActiveNormal: isDayTime ? 'bg-emerald-50 border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]',
-        cardActiveHaram: isDayTime ? 'bg-red-50 border-red-400/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : 'bg-red-900/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]',
-        progressBg: isDayTime ? 'bg-slate-200 border-slate-300' : 'bg-slate-900 border-slate-700/50',
-        titleGradient: isDayTime ? 'from-emerald-600 to-teal-500' : 'from-emerald-400 to-cyan-400',
-        border: isDayTime ? 'border-slate-200' : 'border-slate-700'
-    };
-
-    // Membuat Data Timeline Berjalan
-    const timeline = useMemo(() => {
-        if (!adjustedJadwal) return [];
-        const base = getLocalTime(cityTimezone);
-        
-        return [
-            { id: 'isya_prev', name: 'Isya (Malam)', start: parseTime("00:00", 0, base), end: parseTime("01:00", 0, base), type: 'wajib', icon: 'Stars' },
-            { id: 'tahajjud', name: 'Tahajjud & Sahur', start: parseTime("01:00", 0, base), end: parseTime(adjustedJadwal.imsak, 0, base), type: 'sunnah', icon: 'Moon' },
-            { id: 'imsak', name: 'Imsak', start: parseTime(adjustedJadwal.imsak, 0, base), end: parseTime(adjustedJadwal.subuh, 0, base), type: 'warning', icon: 'Clock' },
-            { id: 'subuh', name: 'Subuh', start: parseTime(adjustedJadwal.subuh, 0, base), end: parseTime(adjustedJadwal.terbit, 0, base), type: 'wajib', icon: 'Sunrise' },
-            { id: 'syuruq', name: 'Syuruq (Larangan)', start: parseTime(adjustedJadwal.terbit, 0, base), end: parseTime(adjustedJadwal.dhuha, 0, base), type: 'haram', icon: 'Sunrise' },
-            { id: 'dhuha', name: 'Dhuha', start: parseTime(adjustedJadwal.dhuha, 0, base), end: parseTime(adjustedJadwal.dzuhur, 0, base), type: 'sunnah', icon: 'Sun' },
-            { id: 'dzuhur', name: 'Dzuhur', start: parseTime(adjustedJadwal.dzuhur, 0, base), end: parseTime(adjustedJadwal.ashar, 0, base), type: 'wajib', icon: 'Sun' },
-            { id: 'ashar', name: 'Ashar', start: parseTime(adjustedJadwal.ashar, 0, base), end: parseTime(adjustedJadwal.maghrib, 0, base), type: 'wajib', icon: 'Sunset' },
-            { id: 'maghrib', name: 'Maghrib (Ifthor)', start: parseTime(adjustedJadwal.maghrib, 0, base), end: parseTime(adjustedJadwal.isya, 0, base), type: 'wajib', icon: 'Sunset' },
-            { id: 'isya', name: 'Isya', start: parseTime(adjustedJadwal.isya, 0, base), end: parseTime("23:59:59", 0, base), type: 'wajib', icon: 'Stars' }
-        ];
-    }, [adjustedJadwal, cityTimezone]);
-
-    // Menentukan Fase Saat Ini & Progress Batang
-    const { currentPhase, nextPhase, progress, timeElapsed, timeRemaining } = useMemo(() => {
-        if (!timeline.length) return {};
-
-        let current = timeline.find(t => currentTime >= t.start && currentTime < t.end);
-        if (!current) current = timeline[timeline.length - 1]; 
-
-        const currentIndex = timeline.findIndex(t => t.id === current.id);
-        const baseNext = getLocalTime(cityTimezone);
-        const next = currentIndex === timeline.length - 1 ? 
-                     { ...timeline[1], start: parseTime("01:00", 1, baseNext) } : 
-                     timeline[currentIndex + 1];
-
-        const totalDuration = current.end - current.start;
-        const elapsed = currentTime - current.start;
-        const remaining = current.end - currentTime;
-        
-        const prog = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
-
-        return {
-            currentPhase: current,
-            nextPhase: next,
-            progress: prog,
-            timeElapsed: elapsed,
-            timeRemaining: remaining
+            return d;
         };
-    }, [timeline, currentTime, cityTimezone]);
 
-    // Data Kartu Detail Waktu
-    const cardsData = useMemo(() => {
-        if (!adjustedJadwal) return [];
-        return [
-            { title: "Tahajjud", time: "01:00", end: adjustedJadwal.imsak, icon: Moon, desc: "Sepertiga malam akhir" },
-            { title: "Sahur", time: "01:00", end: adjustedJadwal.imsak, icon: Clock, desc: "Batas akhir Imsak" },
-            { title: "Subuh", time: adjustedJadwal.subuh, end: adjustedJadwal.terbit, icon: Sunrise, desc: "Sholat Wajib" },
-            { title: "Syuruq", time: adjustedJadwal.terbit, end: adjustedJadwal.dhuha, icon: Sunrise, desc: "Waktu haram sholat", isHaram: true },
-            { title: "Dhuha", time: adjustedJadwal.dhuha, end: adjustedJadwal.dzuhur, icon: Sun, desc: "Sholat Sunnah" },
-            { title: "Dzuhur", time: adjustedJadwal.dzuhur, end: adjustedJadwal.ashar, icon: Sun, desc: "Sholat Wajib" },
-            { title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: Sunset, desc: "Syafi'i: Bayangan = Benda" },
-            { title: "Ifthor / Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: Sunset, desc: "Buka Puasa & Wajib" },
-            { title: "Isya", time: adjustedJadwal.isya, end: "00:00", icon: CloudMoon, desc: "Sholat Wajib" },
-        ];
-    }, [adjustedJadwal]);
+        const formatDuration = (ms) => {
+            if (ms < 0) ms = 0;
+            const hours = Math.floor(ms / (1000 * 60 * 60));
+            const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
 
-    // Layar Loading
-    if (!jadwal || loading) {
-        return (
-            <div className={`flex h-screen items-center justify-center transition-colors duration-500 ${isDayTime ? 'bg-slate-50' : 'bg-slate-900'}`}>
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500"></div>
-            </div>
-        );
-    }
+        const adjustTimeString = (timeStr, offsetMinutes) => {
+            if (!timeStr) return timeStr;
+            const [h, m] = timeStr.split(':').map(Number);
+            const d = new Date();
+            d.setHours(h, m + (offsetMinutes || 0), 0, 0);
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        };
 
-    return (
-        <div className={`min-h-screen transition-colors duration-1000 ${theme.bg} ${theme.text} font-sans pb-20 overflow-x-hidden`}>
-            {/* Header & Hero Section */}
-            <div className="relative pt-8 md:pt-12 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                {/* Tombol Pengaturan */}
-                <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className={`absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full backdrop-blur-md transition-all shadow-lg hover:scale-105 z-20 ${isDayTime ? 'bg-white/80 text-slate-700 hover:bg-emerald-50' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`}
-                    title="Pengaturan"
-                >
-                    <SettingsIcon className="w-6 h-6" />
-                </button>
+        const getCityTimeZone = (cityName) => {
+            const name = cityName.toUpperCase();
+            if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; // WIT
+            if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar"; // WITA
+            return "Asia/Jakarta"; // WIB
+        };
 
-                <div className="text-center mb-8 md:mb-10">
-                    <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${theme.titleGradient} mb-3 md:mb-4 transition-all duration-500`}>
-                        Jadwal Sholat Interaktif
-                    </h1>
-                    <p className={`${theme.textMuted} text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-4`}>
-                        Waktu terkalibrasi otomatis sesuai Madzhab Syafi&apos;i untuk wilayah Indonesia
-                    </p>
-                </div>
+        const getLocalTime = (tz) => {
+            try { return new Date(new Date().toLocaleString('en-US', { timeZone: tz })); } catch (e) { return new Date(); }
+        };
 
-                {/* Panel Kontrol: Kota & Tanggal */}
-                <div className={`${theme.panel} backdrop-blur-md rounded-2xl p-4 md:p-6 max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 items-center justify-between mb-8 md:mb-12 transition-all duration-500`}>
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500 flex-shrink-0">
-                            <MapPin className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <label className={`block text-xs ${theme.textMuted} mb-1 uppercase tracking-wider font-semibold`}>Lokasi Saat Ini</label>
-                            <input 
-                                type="text" 
-                                list="cities-list" 
-                                value={searchCity}
-                                onChange={handleCityChange}
-                                className={`w-full ${theme.inputBg} rounded-lg px-3 md:px-4 py-2 focus:outline-none transition-colors duration-300 text-sm md:text-base truncate`}
-                                placeholder="Ketik nama kota..."
-                            />
-                            <datalist id="cities-list">
-                                {cities.map(city => (
-                                    <option key={city.id} value={city.lokasi}>{city.lokasi}</option>
-                                ))}
-                            </datalist>
-                        </div>
-                    </div>
-                    <div className="text-center sm:text-right w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-slate-300/20 pt-3 sm:pt-0">
-                        <div className={`text-xs md:text-sm ${theme.textMuted} font-medium`}>{displayDate}</div>
-                        <div className="text-2xl sm:text-3xl font-mono font-bold tracking-widest mt-0 sm:mt-1 flex items-baseline">
-                            {formatTimeDisplay(currentTime.getHours(), currentTime.getMinutes())}
-                            <span className="text-sm sm:text-lg text-emerald-500 ml-1">:{currentTime.getSeconds().toString().padStart(2, '0')}</span>
-                            <span className={`text-xs sm:text-sm ${theme.textMuted} ml-2 font-sans tracking-normal font-semibold`}>{tzLabel}</span>
-                        </div>
-                    </div>
-                </div>
+        const getInitialDateStr = (tz) => {
+            const d = getLocalTime(tz);
+            return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+        };
 
-                {/* Hitung Mundur Interaktif & Chart Batang (Progress Bar) */}
-                <div className={`${theme.panel} backdrop-blur-md rounded-2xl md:rounded-3xl p-6 md:p-8 max-w-4xl mx-auto text-center relative overflow-hidden transition-all duration-500`}>
-                    {/* Background decoration */}
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        const safeGetItem = (key, defaultValue) => {
+            try {
+                const item = localStorage.getItem(key);
+                return item !== null ? JSON.parse(item) : defaultValue;
+            } catch (error) { return defaultValue; }
+        };
 
-                    <div className="relative z-10">
-                        <h2 className={`text-lg md:text-xl font-medium mb-1 md:mb-2 ${isDayTime ? 'text-slate-600' : 'text-slate-300'}`}>
-                            Saat ini: <span className="text-emerald-500 font-bold">{currentPhase?.name}</span>
-                        </h2>
+        // --- Komponen Utama ---
+        const App = () => {
+            const [cities, setCities] = useState([]);
+            
+            const [searchCity, setSearchCity] = useState(() => safeGetItem('sholat_city_name', "KOTA JAKARTA"));
+            const [selectedCityId, setSelectedCityId] = useState(() => safeGetItem('sholat_city_id', "1301"));
+            const [cityTimezone, setCityTimezone] = useState(() => safeGetItem('sholat_city_tz', "Asia/Jakarta"));
+            const [jadwal, setJadwal] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [currentTime, setCurrentTime] = useState(getLocalTime(cityTimezone));
+            const [currentDateStr, setCurrentDateStr] = useState(() => getInitialDateStr(cityTimezone));
 
-                        {/* Logika Tampilan Jeda Iqomah vs Hitung Mundur Biasa */}
-                        {(() => {
-                            const isWajib = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].includes(currentPhase?.id);
-                            const qomatMins = qomatDurations[currentPhase?.id] || 0;
-                            // Iqomah aktif jika waktu yang berjalan (timeElapsed) masih kurang dari batas durasi qomat
-                            const isIqomahPeriod = isWajib && (timeElapsed < qomatMins * 60 * 1000);
-                            
-                            if (isIqomahPeriod) {
-                                const iqomahRemaining = (qomatMins * 60 * 1000) - timeElapsed;
-                                return (
-                                    <div className="mb-4 md:mb-6">
-                                        <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tracking-tighter text-amber-500 mb-2 drop-shadow-sm flex items-center justify-center animate-pulse">
-                                            Menuju Iqomah: -{formatDuration(iqomahRemaining)}
-                                        </div>
-                                        <div className={`text-sm sm:text-lg font-medium tracking-tight ${theme.textMuted} flex items-center justify-center`}>
-                                            Waktu sholat tersisa: {formatDuration(timeRemaining)}
-                                        </div>
-                                    </div>
-                                );
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+            const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
+            const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
+            const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
+
+            const playedAdzanRef = useRef(null);
+            const adzanAudioRef = useRef(null);
+
+            useEffect(() => {
+                adzanAudioRef.current = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/30/Adzan_of_Masjid_Al_Haram.ogg');
+            }, []);
+
+            const saveSetting = (key, value) => {
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("Local storage error"); }
+            };
+
+            const adjustedJadwal = useMemo(() => {
+                if (!jadwal) return null;
+                return {
+                    ...jadwal,
+                    imsak: adjustTimeString(jadwal.imsak, offsets.imsak),
+                    subuh: adjustTimeString(jadwal.subuh, offsets.subuh),
+                    terbit: adjustTimeString(jadwal.terbit, offsets.terbit),
+                    dhuha: adjustTimeString(jadwal.dhuha, offsets.dhuha),
+                    dzuhur: adjustTimeString(jadwal.dzuhur, offsets.dzuhur),
+                    ashar: adjustTimeString(jadwal.ashar, offsets.ashar),
+                    maghrib: adjustTimeString(jadwal.maghrib, offsets.maghrib),
+                    isya: adjustTimeString(jadwal.isya, offsets.isya),
+                };
+            }, [jadwal, offsets]);
+
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    const now = getLocalTime(cityTimezone);
+                    setCurrentTime(now);
+
+                    const newDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+                    setCurrentDateStr(prev => {
+                        if (prev !== newDateStr) return newDateStr;
+                        return prev;
+                    });
+
+                    if (adjustedJadwal && audioEnabled) {
+                        const currentHHMM = formatTimeDisplay(now.getHours(), now.getMinutes());
+                        const isWajibAdzan = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].find(
+                            key => adjustedJadwal[key] === currentHHMM
+                        );
+                        
+                        if (isWajibAdzan && now.getSeconds() === 0 && playedAdzanRef.current !== `${adjustedJadwal.tanggal}-${isWajibAdzan}`) {
+                            playedAdzanRef.current = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
+                            if (adzanAudioRef.current) {
+                                adzanAudioRef.current.currentTime = 0;
+                                adzanAudioRef.current.play().catch(e => console.log('Autoplay blocked by browser:', e));
                             }
-                            
-                            return (
-                                <div className="text-5xl sm:text-7xl md:text-8xl font-bold font-mono tracking-tighter mb-4 md:mb-6 drop-shadow-sm flex items-center justify-center">
-                                    <span className={theme.textMuted}>-</span>{formatDuration(timeRemaining)}
-                                </div>
-                            );
-                        })()}
+                        }
+                    }
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [cityTimezone, adjustedJadwal, audioEnabled]);
 
-                        <p className={`text-sm sm:text-base md:text-lg ${theme.textMuted} mb-6 md:mb-8`}>
-                            Menuju <strong className={theme.text}>{nextPhase?.name}</strong> pada pukul {nextPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
-                        </p>
+            useEffect(() => {
+                fetch('https://api.myquran.com/v2/sholat/kota/semua')
+                    .then(res => res.json())
+                    .then(data => { if (data.status) setCities(data.data); })
+                    .catch(err => console.error("Gagal mengambil kota", err));
+            }, []);
 
-                        {/* Chart Batang Interaktif (Progress Bar) */}
-                        <div className="w-full max-w-2xl mx-auto group">
-                            <div className={`flex justify-between text-xs md:text-sm ${theme.textMuted} mb-2 px-1 font-medium`}>
-                                <span>Mulai: {currentPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                                <span className="text-emerald-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                    <Info className="w-3 h-3 md:w-4 md:h-4" /> Berjalan {formatDuration(timeElapsed)}
-                                </span>
-                                <span>Selesai: {currentPhase?.end.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
-                            </div>
-                            <div className={`h-4 md:h-6 w-full ${theme.progressBg} rounded-full overflow-hidden relative shadow-inner border transition-colors duration-500`}>
-                                <div 
-                                    className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${
-                                        currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-red-500 to-red-400' :
-                                        currentPhase?.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-400' :
-                                        'bg-gradient-to-r from-emerald-500 to-teal-400'
-                                    }`}
-                                    style={{ width: `${progress}%` }}
-                                >
-                                    <div className="absolute right-0 top-0 bottom-0 w-3 md:w-4 bg-white/40 blur-[2px]"></div>
-                                </div>
-                            </div>
-                            {currentPhase?.id === 'ashar' && (
-                                <div className={`mt-3 text-[10px] md:text-xs ${theme.textMuted} italic flex items-center justify-center gap-1 leading-tight`}>
-                                    <Info className="w-3 h-3 flex-shrink-0" /> Sesuai Madzhab Syafi&apos;i: Masuk ketika panjang bayangan sama dengan bendanya.
-                                </div>
-                            )}
-                        </div>
+            useEffect(() => {
+                if (!selectedCityId || !currentDateStr) return;
+                setLoading(true);
+
+                fetch(`https://api.myquran.com/v2/sholat/jadwal/${selectedCityId}/${currentDateStr}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status) setJadwal(data.data.jadwal);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("Gagal mengambil jadwal", err);
+                        setLoading(false);
+                    });
+            }, [selectedCityId, currentDateStr]);
+
+            const handleCityChange = (e) => {
+                const val = e.target.value;
+                setSearchCity(val);
+                const found = cities.find(c => c.lokasi === val);
+                if (found) {
+                    setSelectedCityId(found.id);
+                    const tz = getCityTimeZone(found.lokasi);
+                    setCityTimezone(tz);
+                    setCurrentTime(getLocalTime(tz)); 
+                    setCurrentDateStr(getInitialDateStr(tz));
+                    
+                    saveSetting('sholat_city_name', found.lokasi);
+                    saveSetting('sholat_city_id', found.id);
+                    saveSetting('sholat_city_tz', tz);
+                }
+            };
+
+            const isDayTime = useMemo(() => {
+                if (!adjustedJadwal) return true;
+                const base = getLocalTime(cityTimezone);
+                const terbit = parseTime(adjustedJadwal.terbit, 0, base);
+                const maghrib = parseTime(adjustedJadwal.maghrib, 0, base);
+                return currentTime >= terbit && currentTime < maghrib;
+            }, [currentTime, adjustedJadwal, cityTimezone]);
+
+            const tzLabel = useMemo(() => {
+                if (cityTimezone === "Asia/Jayapura") return "WIT";
+                if (cityTimezone === "Asia/Makassar") return "WITA";
+                return "WIB";
+            }, [cityTimezone]);
+
+            const displayDate = useMemo(() => {
+                try {
+                    return new Intl.DateTimeFormat('id-ID', {
+                        timeZone: cityTimezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                    }).format(new Date());
+                } catch (e) {
+                    return jadwal?.tanggal || "";
+                }
+            }, [currentDateStr, cityTimezone, jadwal]);
+
+            const theme = {
+                bg: isDayTime ? 'bg-slate-50' : 'bg-slate-900',
+                text: isDayTime ? 'text-slate-800' : 'text-slate-50',
+                textMuted: isDayTime ? 'text-slate-500' : 'text-slate-400',
+                panel: isDayTime ? 'bg-white/80 border-slate-200 shadow-xl' : 'bg-slate-800/70 border-white/10 shadow-2xl',
+                inputBg: isDayTime ? 'bg-slate-50 border-slate-300 focus:border-emerald-500 text-slate-800' : 'bg-slate-900/50 border-slate-700 focus:border-emerald-500 text-white',
+                card: isDayTime ? 'bg-white border-slate-200 hover:shadow-md' : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800',
+                cardActiveNormal: isDayTime ? 'bg-emerald-50 border-emerald-400/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]' : 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.2)]',
+                cardActiveHaram: isDayTime ? 'bg-red-50 border-red-400/50 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : 'bg-red-900/40 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]',
+                progressBg: isDayTime ? 'bg-slate-200 border-slate-300' : 'bg-slate-900 border-slate-700/50',
+                titleGradient: isDayTime ? 'from-emerald-600 to-teal-500' : 'from-emerald-400 to-cyan-400',
+                border: isDayTime ? 'border-slate-200' : 'border-slate-700'
+            };
+
+            const timeline = useMemo(() => {
+                if (!adjustedJadwal) return [];
+                const base = getLocalTime(cityTimezone);
+                
+                return [
+                    { id: 'isya_prev', name: 'Isya (Malam)', start: parseTime("00:00", 0, base), end: parseTime("01:00", 0, base), type: 'wajib' },
+                    { id: 'tahajjud', name: 'Tahajjud & Sahur', start: parseTime("01:00", 0, base), end: parseTime(adjustedJadwal.imsak, 0, base), type: 'sunnah' },
+                    { id: 'imsak', name: 'Imsak', start: parseTime(adjustedJadwal.imsak, 0, base), end: parseTime(adjustedJadwal.subuh, 0, base), type: 'warning' },
+                    { id: 'subuh', name: 'Subuh', start: parseTime(adjustedJadwal.subuh, 0, base), end: parseTime(adjustedJadwal.terbit, 0, base), type: 'wajib' },
+                    { id: 'syuruq', name: 'Syuruq (Larangan)', start: parseTime(adjustedJadwal.terbit, 0, base), end: parseTime(adjustedJadwal.dhuha, 0, base), type: 'haram' },
+                    { id: 'dhuha', name: 'Dhuha', start: parseTime(adjustedJadwal.dhuha, 0, base), end: parseTime(adjustedJadwal.dzuhur, 0, base), type: 'sunnah' },
+                    { id: 'dzuhur', name: 'Dzuhur', start: parseTime(adjustedJadwal.dzuhur, 0, base), end: parseTime(adjustedJadwal.ashar, 0, base), type: 'wajib' },
+                    { id: 'ashar', name: 'Ashar', start: parseTime(adjustedJadwal.ashar, 0, base), end: parseTime(adjustedJadwal.maghrib, 0, base), type: 'wajib' },
+                    { id: 'maghrib', name: 'Maghrib (Ifthor)', start: parseTime(adjustedJadwal.maghrib, 0, base), end: parseTime(adjustedJadwal.isya, 0, base), type: 'wajib' },
+                    { id: 'isya', name: 'Isya', start: parseTime(adjustedJadwal.isya, 0, base), end: parseTime("23:59:59", 0, base), type: 'wajib' }
+                ];
+            }, [adjustedJadwal, cityTimezone]);
+
+            const { currentPhase, nextPhase, progress, timeElapsed, timeRemaining } = useMemo(() => {
+                if (!timeline.length) return {};
+
+                let current = timeline.find(t => currentTime >= t.start && currentTime < t.end) || timeline[timeline.length - 1]; 
+                const currentIndex = timeline.findIndex(t => t.id === current.id);
+                const baseNext = getLocalTime(cityTimezone);
+                const next = currentIndex === timeline.length - 1 ? 
+                             { ...timeline[1], start: parseTime("01:00", 1, baseNext) } : 
+                             timeline[currentIndex + 1];
+
+                const totalDuration = current.end - current.start;
+                const elapsed = currentTime - current.start;
+                const remaining = current.end - currentTime;
+                const prog = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+
+                return { currentPhase: current, nextPhase: next, progress: prog, timeElapsed: elapsed, timeRemaining: remaining };
+            }, [timeline, currentTime, cityTimezone]);
+
+            const cardsData = useMemo(() => {
+                if (!adjustedJadwal) return [];
+                return [
+                    { title: "Tahajjud", time: "01:00", end: adjustedJadwal.imsak, icon: IconMoon, desc: "Sepertiga malam akhir" },
+                    { title: "Sahur", time: "01:00", end: adjustedJadwal.imsak, icon: IconClock, desc: "Batas akhir Imsak" },
+                    { title: "Subuh", time: adjustedJadwal.subuh, end: adjustedJadwal.terbit, icon: IconSunrise, desc: "Sholat Wajib" },
+                    { title: "Syuruq", time: adjustedJadwal.terbit, end: adjustedJadwal.dhuha, icon: IconSunrise, desc: "Waktu haram sholat", isHaram: true },
+                    { title: "Dhuha", time: adjustedJadwal.dhuha, end: adjustedJadwal.dzuhur, icon: IconSun, desc: "Sholat Sunnah" },
+                    { title: "Dzuhur", time: adjustedJadwal.dzuhur, end: adjustedJadwal.ashar, icon: IconSun, desc: "Sholat Wajib" },
+                    { title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: IconSunset, desc: "Syafi'i: Bayangan = Benda" },
+                    { title: "Ifthor / Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: IconSunset, desc: "Buka Puasa & Wajib" },
+                    { title: "Isya", time: adjustedJadwal.isya, end: "00:00", icon: IconCloudMoon, desc: "Sholat Wajib" },
+                ];
+            }, [adjustedJadwal]);
+
+            if (!jadwal || loading) {
+                return (
+                    <div className={`flex h-screen items-center justify-center transition-colors duration-500 ${isDayTime ? 'bg-slate-50' : 'bg-slate-900'}`}>
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500"></div>
                     </div>
-                </div>
+                );
+            }
 
-                {/* Grid Waktu Sholat */}
-                <div className="mt-10 md:mt-16">
-                    <h3 className={`text-xl md:text-2xl font-bold mb-6 md:mb-8 text-center border-b ${theme.border} pb-3 md:pb-4 max-w-[200px] md:max-w-xs mx-auto transition-colors duration-500`}>
-                        Jadwal Lengkap
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
-                        {cardsData.map((card, idx) => {
-                            let isActive = false;
-                            if (currentPhase) {
-                                if (card.title === "Tahajjud" && currentPhase.id === 'tahajjud') isActive = true;
-                                if (card.title === "Sahur" && currentPhase.id === 'tahajjud') isActive = true; 
-                                if (card.title.includes("Subuh") && currentPhase.id === 'subuh') isActive = true;
-                                if (card.title.includes("Syuruq") && currentPhase.id === 'syuruq') isActive = true;
-                                if (card.title.includes("Dhuha") && currentPhase.id === 'dhuha') isActive = true;
-                                if (card.title.includes("Dzuhur") && currentPhase.id === 'dzuhur') isActive = true;
-                                if (card.title.includes("Ashar") && currentPhase.id === 'ashar') isActive = true;
-                                if (card.title.includes("Ifthor") && currentPhase.id === 'maghrib') isActive = true;
-                                if (card.title.includes("Isya") && currentPhase.id === 'isya') isActive = true;
-                            }
+            return (
+                <div className={`min-h-screen transition-colors duration-1000 ${theme.bg} ${theme.text} font-sans pb-20 overflow-x-hidden`}>
+                    <div className="relative pt-8 md:pt-12 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                        <button 
+                            onClick={() => setIsSettingsOpen(true)}
+                            className={`absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full backdrop-blur-md transition-all shadow-lg hover:scale-105 z-20 ${isDayTime ? 'bg-white/80 text-slate-700 hover:bg-emerald-50' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`}
+                            title="Pengaturan"
+                        >
+                            <IconSettings className="w-6 h-6" />
+                        </button>
 
-                            const activeStyle = card.isHaram ? theme.cardActiveHaram : theme.cardActiveNormal;
-                            const defaultStyle = theme.card;
-                            const IconComponent = card.icon;
+                        <div className="text-center mb-8 md:mb-10">
+                            <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${theme.titleGradient} mb-3 md:mb-4 transition-all duration-500`}>
+                                Jadwal Sholat Interaktif
+                            </h1>
+                            <p className={`${theme.textMuted} text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-4`}>
+                                Waktu terkalibrasi otomatis sesuai Madzhab Syafi&apos;i untuk wilayah Indonesia
+                            </p>
+                        </div>
 
-                            return (
-                                <div 
-                                    key={idx} 
-                                    className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${
-                                        isActive 
-                                            ? `${activeStyle} sm:scale-105 z-10`
-                                            : `${defaultStyle}`
-                                    }`}
-                                >
-                                    {isActive && (
-                                        <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
-                                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-red-400' : 'bg-emerald-400'} opacity-75`}></span>
-                                            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 md:h-3 md:w-3 ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl p-4 md:p-6 max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 items-center justify-between mb-8 md:mb-12 transition-all duration-500`}>
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                                <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-500 flex-shrink-0">
+                                    <IconMapPin className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <label className={`block text-xs ${theme.textMuted} mb-1 uppercase tracking-wider font-semibold`}>Lokasi Saat Ini</label>
+                                    <input 
+                                        type="text" 
+                                        list="cities-list" 
+                                        value={searchCity}
+                                        onChange={handleCityChange}
+                                        className={`w-full ${theme.inputBg} rounded-lg px-3 md:px-4 py-2 focus:outline-none transition-colors duration-300 text-sm md:text-base truncate`}
+                                        placeholder="Ketik nama kota..."
+                                    />
+                                    <datalist id="cities-list">
+                                        {cities.map(city => (
+                                            <option key={city.id} value={city.lokasi}>{city.lokasi}</option>
+                                        ))}
+                                    </datalist>
+                                </div>
+                            </div>
+                            <div className="text-center sm:text-right w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-slate-300/20 pt-3 sm:pt-0">
+                                <div className={`text-xs md:text-sm ${theme.textMuted} font-medium`}>{displayDate}</div>
+                                <div className="text-2xl sm:text-3xl font-mono font-bold tracking-widest mt-0 sm:mt-1 flex items-baseline">
+                                    {formatTimeDisplay(currentTime.getHours(), currentTime.getMinutes())}
+                                    <span className="text-sm sm:text-lg text-emerald-500 ml-1">:{currentTime.getSeconds().toString().padStart(2, '0')}</span>
+                                    <span className={`text-xs sm:text-sm ${theme.textMuted} ml-2 font-sans tracking-normal font-semibold`}>{tzLabel}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className={`${theme.panel} backdrop-blur-md rounded-2xl md:rounded-3xl p-6 md:p-8 max-w-4xl mx-auto text-center relative overflow-hidden transition-all duration-500`}>
+                            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                            <div className="relative z-10">
+                                <h2 className={`text-lg md:text-xl font-medium mb-1 md:mb-2 ${isDayTime ? 'text-slate-600' : 'text-slate-300'}`}>
+                                    Saat ini: <span className="text-emerald-500 font-bold">{currentPhase?.name}</span>
+                                </h2>
+
+                                {(() => {
+                                    const isWajib = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].includes(currentPhase?.id);
+                                    const qomatMins = qomatDurations[currentPhase?.id] || 0;
+                                    const isIqomahPeriod = isWajib && (timeElapsed < qomatMins * 60 * 1000);
+                                    
+                                    if (isIqomahPeriod) {
+                                        const iqomahRemaining = (qomatMins * 60 * 1000) - timeElapsed;
+                                        return (
+                                            <div className="mb-4 md:mb-6">
+                                                <div className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tracking-tighter text-amber-500 mb-2 drop-shadow-sm flex items-center justify-center animate-pulse">
+                                                    Menuju Iqomah: -{formatDuration(iqomahRemaining)}
+                                                </div>
+                                                <div className={`text-sm sm:text-lg font-medium tracking-tight ${theme.textMuted} flex items-center justify-center`}>
+                                                    Waktu sholat tersisa: {formatDuration(timeRemaining)}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="text-5xl sm:text-7xl md:text-8xl font-bold font-mono tracking-tighter mb-4 md:mb-6 drop-shadow-sm flex items-center justify-center">
+                                            <span className={theme.textMuted}>-</span>{formatDuration(timeRemaining)}
+                                        </div>
+                                    );
+                                })()}
+
+                                <p className={`text-sm sm:text-base md:text-lg ${theme.textMuted} mb-6 md:mb-8`}>
+                                    Menuju <strong className={theme.text}>{nextPhase?.name}</strong> pada pukul {nextPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
+                                </p>
+
+                                <div className="w-full max-w-2xl mx-auto group">
+                                    <div className={`flex justify-between text-xs md:text-sm ${theme.textMuted} mb-2 px-1 font-medium`}>
+                                        <span>Mulai: {currentPhase?.start.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
+                                        <span className="text-emerald-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                            <IconInfo className="w-3 h-3 md:w-4 md:h-4" /> Berjalan {formatDuration(timeElapsed)}
                                         </span>
-                                    )}
-                                    
-                                    <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${
-                                        isActive ? (card.isHaram ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600') : `bg-slate-200/50 ${theme.textMuted}`
-                                    }`}>
-                                        <IconComponent className="w-5 h-5 md:w-6 md:h-6" />
+                                        <span>Selesai: {currentPhase?.end.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                     </div>
-                                    
-                                    <h4 className={`text-sm md:text-lg font-semibold mb-1 transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-900' : 'text-white') : theme.text}`}>{card.title}</h4>
-                                    <div className="flex items-end gap-2 mb-1 md:mb-2">
-                                        <span className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-800' : 'text-slate-100') : theme.text}`}>{card.time}</span>
+                                    <div className={`h-4 md:h-6 w-full ${theme.progressBg} rounded-full overflow-hidden relative shadow-inner border transition-colors duration-500`}>
+                                        <div 
+                                            className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${
+                                                currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-red-500 to-red-400' :
+                                                currentPhase?.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-400' :
+                                                'bg-gradient-to-r from-emerald-500 to-teal-400'
+                                            }`}
+                                            style={{ width: `${progress}%` }}
+                                        >
+                                            <div className="absolute right-0 top-0 bottom-0 w-3 md:w-4 bg-white/40 blur-[2px]"></div>
+                                        </div>
                                     </div>
-                                    
-                                    <p className={`text-[10px] md:text-xs leading-tight transition-colors duration-500 ${card.isHaram ? 'text-red-500' : theme.textMuted}`}>
-                                        {card.desc}
-                                    </p>
-
-                                    {/* Garis Progress Mini untuk Kartu Aktif */}
-                                    {isActive && (
-                                        <div className="absolute bottom-0 left-0 h-1 md:h-1.5 bg-slate-200 dark:bg-slate-700 w-full transition-colors duration-500">
-                                            <div 
-                                                className={`h-full ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`} 
-                                                style={{width: `${progress}%`}}
-                                            ></div>
+                                    {currentPhase?.id === 'ashar' && (
+                                        <div className={`mt-3 text-[10px] md:text-xs ${theme.textMuted} italic flex items-center justify-center gap-1 leading-tight`}>
+                                            <IconInfo className="w-3 h-3 flex-shrink-0" /> Sesuai Madzhab Syafi&apos;i: Masuk ketika panjang bayangan sama dengan bendanya.
                                         </div>
                                     )}
                                 </div>
-                            );
-                        })}
+                            </div>
+                        </div>
+
+                        <div className="mt-10 md:mt-16">
+                            <h3 className={`text-xl md:text-2xl font-bold mb-6 md:mb-8 text-center border-b ${theme.border} pb-3 md:pb-4 max-w-[200px] md:max-w-xs mx-auto transition-colors duration-500`}>
+                                Jadwal Lengkap
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+                                {cardsData.map((card, idx) => {
+                                    let isActive = false;
+                                    if (currentPhase) {
+                                        if (card.title === "Tahajjud" && currentPhase.id === 'tahajjud') isActive = true;
+                                        if (card.title === "Sahur" && currentPhase.id === 'tahajjud') isActive = true; 
+                                        if (card.title.includes("Subuh") && currentPhase.id === 'subuh') isActive = true;
+                                        if (card.title.includes("Syuruq") && currentPhase.id === 'syuruq') isActive = true;
+                                        if (card.title.includes("Dhuha") && currentPhase.id === 'dhuha') isActive = true;
+                                        if (card.title.includes("Dzuhur") && currentPhase.id === 'dzuhur') isActive = true;
+                                        if (card.title.includes("Ashar") && currentPhase.id === 'ashar') isActive = true;
+                                        if (card.title.includes("Ifthor") && currentPhase.id === 'maghrib') isActive = true;
+                                        if (card.title.includes("Isya") && currentPhase.id === 'isya') isActive = true;
+                                    }
+
+                                    const activeStyle = card.isHaram ? theme.cardActiveHaram : theme.cardActiveNormal;
+                                    const defaultStyle = theme.card;
+                                    const IconComponent = card.icon;
+
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${
+                                                isActive ? `${activeStyle} sm:scale-105 z-10` : `${defaultStyle}`
+                                            }`}
+                                        >
+                                            {isActive && (
+                                                <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
+                                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-red-400' : 'bg-emerald-400'} opacity-75`}></span>
+                                                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 md:h-3 md:w-3 ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                                                </span>
+                                            )}
+                                            
+                                            <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${
+                                                isActive ? (card.isHaram ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600') : `bg-slate-200/50 ${theme.textMuted}`
+                                            }`}>
+                                                <IconComponent className="w-5 h-5 md:w-6 md:h-6" />
+                                            </div>
+                                            
+                                            <h4 className={`text-sm md:text-lg font-semibold mb-1 transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-900' : 'text-white') : theme.text}`}>{card.title}</h4>
+                                            <div className="flex items-end gap-2 mb-1 md:mb-2">
+                                                <span className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-800' : 'text-slate-100') : theme.text}`}>{card.time}</span>
+                                            </div>
+                                            
+                                            <p className={`text-[10px] md:text-xs leading-tight transition-colors duration-500 ${card.isHaram ? 'text-red-500' : theme.textMuted}`}>
+                                                {card.desc}
+                                            </p>
+
+                                            {isActive && (
+                                                <div className="absolute bottom-0 left-0 h-1 md:h-1.5 bg-slate-200 dark:bg-slate-700 w-full transition-colors duration-500">
+                                                    <div className={`h-full ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${progress}%`}}></div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Modal Pengaturan Terpusat */}
+                        {isSettingsOpen && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                                <div className={`${theme.panel} w-full max-w-lg rounded-2xl md:rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto relative shadow-2xl transition-all`}>
+                                    <button onClick={() => setIsSettingsOpen(false)} className={`absolute top-4 right-4 p-2 rounded-full hover:bg-slate-500/20 transition-colors ${theme.text}`}>
+                                        <IconX className="w-6 h-6" />
+                                    </button>
+
+                                    <h2 className={`text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 ${theme.text}`}>
+                                        <IconSettings className="w-6 h-6 text-emerald-500" /> Pengaturan Aplikasi
+                                    </h2>
+
+                                    <div className={`mb-6 p-4 rounded-xl border ${theme.border} flex justify-between items-center bg-slate-500/5`}>
+                                        <div>
+                                            <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
+                                                {audioEnabled ? <IconVolume2 className="w-5 h-5 text-emerald-500" /> : <IconVolumeX className="w-5 h-5 text-red-500" />}
+                                                Suara Adzan
+                                            </h3>
+                                            <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu wajib</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
+                                                const val = e.target.checked;
+                                                setAudioEnabled(val);
+                                                saveSetting('sholat_audio', val);
+                                            }} />
+                                            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                        </label>
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconClock className="w-4 h-4"/> Jeda Waktu Iqomah (Menit)</h3>
+                                        <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Waktu tunggu khusus (Iqomah) setelah Adzan.</p>
+                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                            {['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
+                                                <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
+                                                    <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
+                                                    <input 
+                                                        type="number" min="0" value={qomatDurations[key]} 
+                                                        onChange={(e) => {
+                                                            const newQomat = {...qomatDurations, [key]: Math.max(0, parseInt(e.target.value) || 0)};
+                                                            setQomatDurations(newQomat);
+                                                            saveSetting('sholat_qomat', newQomat);
+                                                        }}
+                                                        className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-2">
+                                        <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconSettings className="w-4 h-4"/> Koreksi Jadwal (Menit)</h3>
+                                        <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Isi nilai - (minus) untuk mempercepat atau + (plus) untuk memperlambat.</p>
+                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                            {['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
+                                                <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
+                                                    <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
+                                                    <input 
+                                                        type="number" value={offsets[key]} 
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value);
+                                                            const newOffsets = {...offsets, [key]: isNaN(val) ? 0 : val};
+                                                            setOffsets(newOffsets);
+                                                            saveSetting('sholat_offsets', newOffsets);
+                                                        }}
+                                                        className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
+            );
+        }
 
-                {/* Modal Pengaturan Terpusat */}
-                {isSettingsOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                        <div className={`${theme.panel} w-full max-w-lg rounded-2xl md:rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto relative shadow-2xl transition-all`}>
-                            <button 
-                                onClick={() => setIsSettingsOpen(false)}
-                                className={`absolute top-4 right-4 p-2 rounded-full hover:bg-slate-500/20 transition-colors ${theme.text}`}
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-
-                            <h2 className={`text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 ${theme.text}`}>
-                                <SettingsIcon className="w-6 h-6 text-emerald-500" /> Pengaturan Aplikasi
-                            </h2>
-
-                            {/* Suara Adzan */}
-                            <div className={`mb-6 p-4 rounded-xl border ${theme.border} flex justify-between items-center bg-slate-500/5`}>
-                                <div>
-                                    <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
-                                        {audioEnabled ? <Volume2 className="w-5 h-5 text-emerald-500" /> : <VolumeX className="w-5 h-5 text-red-500" />}
-                                        Suara Adzan
-                                    </h3>
-                                    <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu wajib</p>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
-                                        const val = e.target.checked;
-                                        setAudioEnabled(val);
-                                        saveSetting('sholat_audio', val);
-                                    }} />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                </label>
-                            </div>
-
-                            {/* Waktu Iqomah */}
-                            <div className="mb-6">
-                                <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><Clock className="w-4 h-4"/> Jeda Waktu Iqomah (Menit)</h3>
-                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Waktu tunggu khusus (Iqomah) setelah Adzan.</p>
-                                <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                    {['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
-                                        <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
-                                            <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
-                                            <input 
-                                                type="number" 
-                                                min="0"
-                                                value={qomatDurations[key]} 
-                                                onChange={(e) => {
-                                                    const newQomat = {...qomatDurations, [key]: Math.max(0, parseInt(e.target.value) || 0)};
-                                                    setQomatDurations(newQomat);
-                                                    saveSetting('sholat_qomat', newQomat);
-                                                }}
-                                                className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Koreksi Waktu */}
-                            <div className="mb-2">
-                                <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><SettingsIcon className="w-4 h-4"/> Koreksi Jadwal (Menit)</h3>
-                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Isi nilai - (minus) untuk mempercepat atau + (plus) untuk memperlambat.</p>
-                                <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                    {['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
-                                        <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
-                                            <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
-                                            <input 
-                                                type="number" 
-                                                value={offsets[key]} 
-                                                onChange={(e) => {
-                                                    const val = parseInt(e.target.value);
-                                                    const newOffsets = {...offsets, [key]: isNaN(val) ? 0 : val};
-                                                    setOffsets(newOffsets);
-                                                    saveSetting('sholat_offsets', newOffsets);
-                                                }}
-                                                className={`w-14 md:w-16 p-1 text-center rounded border ${theme.inputBg} text-xs md:text-sm font-semibold`}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
