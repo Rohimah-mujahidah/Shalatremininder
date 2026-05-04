@@ -3,34 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- KEAMANAN ANDROID TERBARU: Memaksa semua request menjadi HTTPS -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     
     <title>Jadwal Sholat Interaktif</title>
 
-    <!-- Menghubungkan Web App Manifest untuk PWA -->
     <link rel="manifest" href="./manifest.json">
-
-    <!-- Pengaturan Meta Tags Mobile -->
     <meta name="theme-color" content="#0ea5e9">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Jadwal Sholat">
     
-    <!-- Favicon & Apple Touch Icon -->
     <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
     <link rel="icon" type="image/x-icon" href="./assets/icons/favicon.ico">
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- React & ReactDOM (Production) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- Babel untuk kompilasi JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -45,13 +34,12 @@
 <body class="bg-slate-900 text-slate-50 overflow-x-hidden">
     <div id="root"></div>
 
-    <!-- REGISTRASI SERVICE WORKER (Wajib untuk Android/PWA Terbaru) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker terdaftar di scope:', reg.scope))
-                    .catch(err => console.log('Pendaftaran Service Worker gagal:', err));
+                    .then(reg => console.log('SW Terdaftar'))
+                    .catch(err => console.log('SW Gagal:', err));
             });
         }
     </script>
@@ -59,7 +47,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- Ikon SVG (Dipendekkan agar fokus pada logika) ---
         const IconMoon = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
         const IconSunrise = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6"/><path d="M8.4 10.4 4.2 6.2"/><path d="M15.6 10.4l4.2-4.2"/><path d="M22 18h-2"/><path d="M4 18H2"/><path d="M12 14v4"/><path d="M8 22h8"/></svg>;
         const IconSun = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
@@ -72,8 +59,8 @@
         const IconVolume2 = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>;
         const IconVolumeX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
         const IconX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+        const IconPlay = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>;
 
-        // --- Fungsi Bantuan ---
         const formatTimeDisplay = (hours, minutes) => `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         const parseTime = (timeStr, offsetDay = 0, baseDate = new Date()) => {
             if (!timeStr) return baseDate;
@@ -130,34 +117,18 @@
             const playedAdzanRef = useRef(null);
             const adzanAudioRef = useRef(null);
 
-            // --- AUDIO UNLOCKER UNTUK ANDROID ---
+            // Inisialisasi Audio dengan Format MP3 yang lebih aman
             useEffect(() => {
-                adzanAudioRef.current = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/30/Adzan_of_Masjid_Al_Haram.ogg');
-                
-                // Minta izin ke browser Android dengan memutar audio sunyi di background saat pertama kali layar disentuh
-                const unlockAudioContext = () => {
-                    if (adzanAudioRef.current) {
-                        adzanAudioRef.current.play().then(() => {
-                            adzanAudioRef.current.pause();
-                            adzanAudioRef.current.currentTime = 0;
-                        }).catch(e => console.log('Menunggu interaksi user untuk unlock audio'));
-                    }
-                    // Hapus event listener agar tidak berat
-                    document.removeEventListener('click', unlockAudioContext);
-                    document.removeEventListener('touchstart', unlockAudioContext);
-                };
-
-                document.addEventListener('click', unlockAudioContext);
-                document.addEventListener('touchstart', unlockAudioContext);
-
-                return () => {
-                    document.removeEventListener('click', unlockAudioContext);
-                    document.removeEventListener('touchstart', unlockAudioContext);
-                };
+                // SANGAT DISARANKAN: Unduh file mp3 dan letakkan di folder assets/audio/adzan.mp3
+                // URL di bawah hanya sebagai fallback/contoh online
+                adzanAudioRef.current = new Audio('./assets/audio/adzan.mp3'); 
+                // Jika file lokal belum dibuat, gunakan fallback ini sementara:
+                adzanAudioRef.current.src = "https://raw.githubusercontent.com/islamic-network/cdn/master/adhan/makkah.mp3";
+                adzanAudioRef.current.preload = "auto";
             }, []);
 
             const saveSetting = (key, value) => {
-                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn("Local storage error"); }
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
             };
 
             const adjustedJadwal = useMemo(() => {
@@ -192,11 +163,19 @@
                             key => adjustedJadwal[key] === currentHHMM
                         );
                         
-                        if (isWajibAdzan && now.getSeconds() === 0 && playedAdzanRef.current !== `${adjustedJadwal.tanggal}-${isWajibAdzan}`) {
-                            playedAdzanRef.current = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
-                            if (adzanAudioRef.current) {
-                                adzanAudioRef.current.currentTime = 0;
-                                adzanAudioRef.current.play().catch(e => console.log('Autoplay audio diblokir oleh Android. Butuh klik layar.'));
+                        // Perbaikan: Syarat detik dihilangkan agar tidak terlewat saat browser standby/di-throttle
+                        if (isWajibAdzan) {
+                            const adzanId = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
+                            
+                            // Hanya putar jika ID (tanggal & waktu) belum pernah diputar hari ini
+                            if (playedAdzanRef.current !== adzanId) {
+                                playedAdzanRef.current = adzanId;
+                                if (adzanAudioRef.current) {
+                                    adzanAudioRef.current.currentTime = 0;
+                                    adzanAudioRef.current.play().catch(e => {
+                                        console.log("Audio diblokir oleh sistem HP. Harap gunakan tombol 'Test Suara' di pengaturan.");
+                                    });
+                                }
                             }
                         }
                     }
@@ -221,10 +200,7 @@
                         if (data.status) setJadwal(data.data.jadwal);
                         setLoading(false);
                     })
-                    .catch(err => {
-                        console.error("Gagal mengambil jadwal", err);
-                        setLoading(false);
-                    });
+                    .catch(err => { setLoading(false); });
             }, [selectedCityId, currentDateStr]);
 
             const handleCityChange = (e) => {
@@ -241,6 +217,13 @@
                     saveSetting('sholat_city_name', found.lokasi);
                     saveSetting('sholat_city_id', found.id);
                     saveSetting('sholat_city_tz', tz);
+                }
+            };
+
+            const testAudio = () => {
+                if(adzanAudioRef.current) {
+                    adzanAudioRef.current.currentTime = 0;
+                    adzanAudioRef.current.play().catch(e => alert("Gagal memutar audio: " + e.message));
                 }
             };
 
@@ -285,7 +268,6 @@
             const timeline = useMemo(() => {
                 if (!adjustedJadwal) return [];
                 const base = getLocalTime(cityTimezone);
-                
                 return [
                     { id: 'isya_prev', name: 'Isya (Malam)', start: parseTime("00:00", 0, base), end: parseTime("01:00", 0, base), type: 'wajib' },
                     { id: 'tahajjud', name: 'Tahajjud & Sahur', start: parseTime("01:00", 0, base), end: parseTime(adjustedJadwal.imsak, 0, base), type: 'sunnah' },
@@ -302,20 +284,14 @@
 
             const { currentPhase, nextPhase, progress, timeElapsed, timeRemaining } = useMemo(() => {
                 if (!timeline.length) return {};
-
                 let current = timeline.find(t => currentTime >= t.start && currentTime < t.end) || timeline[timeline.length - 1]; 
                 const currentIndex = timeline.findIndex(t => t.id === current.id);
                 const baseNext = getLocalTime(cityTimezone);
-                const next = currentIndex === timeline.length - 1 ? 
-                             { ...timeline[1], start: parseTime("01:00", 1, baseNext) } : 
-                             timeline[currentIndex + 1];
-
+                const next = currentIndex === timeline.length - 1 ? { ...timeline[1], start: parseTime("01:00", 1, baseNext) } : timeline[currentIndex + 1];
                 const totalDuration = current.end - current.start;
                 const elapsed = currentTime - current.start;
-                const remaining = current.end - currentTime;
                 const prog = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
-
-                return { currentPhase: current, nextPhase: next, progress: prog, timeElapsed: elapsed, timeRemaining: remaining };
+                return { currentPhase: current, nextPhase: next, progress: prog, timeElapsed: elapsed, timeRemaining: current.end - currentTime };
             }, [timeline, currentTime, cityTimezone]);
 
             const cardsData = useMemo(() => {
@@ -347,7 +323,6 @@
                         <button 
                             onClick={() => setIsSettingsOpen(true)}
                             className={`absolute top-4 right-4 md:top-8 md:right-8 p-3 rounded-full backdrop-blur-md transition-all shadow-lg hover:scale-105 z-20 ${isDayTime ? 'bg-white/80 text-slate-700 hover:bg-emerald-50' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`}
-                            title="Pengaturan"
                         >
                             <IconSettings className="w-6 h-6" />
                         </button>
@@ -356,9 +331,6 @@
                             <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${theme.titleGradient} mb-3 md:mb-4 transition-all duration-500`}>
                                 Jadwal Sholat Interaktif
                             </h1>
-                            <p className={`${theme.textMuted} text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-4`}>
-                                Waktu terkalibrasi otomatis sesuai Madzhab Syafi&apos;i untuk wilayah Indonesia
-                            </p>
                         </div>
 
                         <div className={`${theme.panel} backdrop-blur-md rounded-2xl p-4 md:p-6 max-w-3xl mx-auto flex flex-col sm:flex-row gap-4 items-center justify-between mb-8 md:mb-12 transition-all duration-500`}>
@@ -369,17 +341,12 @@
                                 <div className="flex-1 min-w-0">
                                     <label className={`block text-xs ${theme.textMuted} mb-1 uppercase tracking-wider font-semibold`}>Lokasi Saat Ini</label>
                                     <input 
-                                        type="text" 
-                                        list="cities-list" 
-                                        value={searchCity}
-                                        onChange={handleCityChange}
+                                        type="text" list="cities-list" value={searchCity} onChange={handleCityChange}
                                         className={`w-full ${theme.inputBg} rounded-lg px-3 md:px-4 py-2 focus:outline-none transition-colors duration-300 text-sm md:text-base truncate`}
                                         placeholder="Ketik nama kota..."
                                     />
                                     <datalist id="cities-list">
-                                        {cities.map(city => (
-                                            <option key={city.id} value={city.lokasi}>{city.lokasi}</option>
-                                        ))}
+                                        {cities.map(city => <option key={city.id} value={city.lokasi}>{city.lokasi}</option>)}
                                     </datalist>
                                 </div>
                             </div>
@@ -451,11 +418,6 @@
                                             <div className="absolute right-0 top-0 bottom-0 w-3 md:w-4 bg-white/40 blur-[2px]"></div>
                                         </div>
                                     </div>
-                                    {currentPhase?.id === 'ashar' && (
-                                        <div className={`mt-3 text-[10px] md:text-xs ${theme.textMuted} italic flex items-center justify-center gap-1 leading-tight`}>
-                                            <IconInfo className="w-3 h-3 flex-shrink-0" /> Sesuai Madzhab Syafi&apos;i: Masuk ketika panjang bayangan sama dengan bendanya.
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -484,12 +446,7 @@
                                     const IconComponent = card.icon;
 
                                     return (
-                                        <div 
-                                            key={idx} 
-                                            className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${
-                                                isActive ? `${activeStyle} sm:scale-105 z-10` : `${defaultStyle}`
-                                            }`}
-                                        >
+                                        <div key={idx} className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${isActive ? `${activeStyle} sm:scale-105 z-10` : `${defaultStyle}`}`}>
                                             {isActive && (
                                                 <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
                                                     <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-red-400' : 'bg-emerald-400'} opacity-75`}></span>
@@ -497,9 +454,7 @@
                                                 </span>
                                             )}
                                             
-                                            <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${
-                                                isActive ? (card.isHaram ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600') : `bg-slate-200/50 ${theme.textMuted}`
-                                            }`}>
+                                            <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${isActive ? (card.isHaram ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600') : `bg-slate-200/50 ${theme.textMuted}`}`}>
                                                 <IconComponent className="w-5 h-5 md:w-6 md:h-6" />
                                             </div>
                                             
@@ -508,10 +463,6 @@
                                                 <span className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight transition-colors duration-500 ${isActive ? (isDayTime ? 'text-slate-800' : 'text-slate-100') : theme.text}`}>{card.time}</span>
                                             </div>
                                             
-                                            <p className={`text-[10px] md:text-xs leading-tight transition-colors duration-500 ${card.isHaram ? 'text-red-500' : theme.textMuted}`}>
-                                                {card.desc}
-                                            </p>
-
                                             {isActive && (
                                                 <div className="absolute bottom-0 left-0 h-1 md:h-1.5 bg-slate-200 dark:bg-slate-700 w-full transition-colors duration-500">
                                                     <div className={`h-full ${card.isHaram ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${progress}%`}}></div>
@@ -535,22 +486,32 @@
                                         <IconSettings className="w-6 h-6 text-emerald-500" /> Pengaturan Aplikasi
                                     </h2>
 
-                                    <div className={`mb-6 p-4 rounded-xl border ${theme.border} flex justify-between items-center bg-slate-500/5`}>
-                                        <div>
-                                            <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
-                                                {audioEnabled ? <IconVolume2 className="w-5 h-5 text-emerald-500" /> : <IconVolumeX className="w-5 h-5 text-red-500" />}
-                                                Suara Adzan
-                                            </h3>
-                                            <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu wajib</p>
+                                    <div className={`mb-6 p-4 rounded-xl border ${theme.border} bg-slate-500/5`}>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <div>
+                                                <h3 className={`font-semibold ${theme.text} flex items-center gap-2 text-sm md:text-base`}>
+                                                    {audioEnabled ? <IconVolume2 className="w-5 h-5 text-emerald-500" /> : <IconVolumeX className="w-5 h-5 text-red-500" />}
+                                                    Suara Adzan
+                                                </h3>
+                                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu wajib</p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
+                                                    const val = e.target.checked;
+                                                    setAudioEnabled(val);
+                                                    saveSetting('sholat_audio', val);
+                                                }} />
+                                                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                            </label>
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
-                                                const val = e.target.checked;
-                                                setAudioEnabled(val);
-                                                saveSetting('sholat_audio', val);
-                                            }} />
-                                            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                        </label>
+                                        
+                                        {/* TOMBOL TEST AUDIO (Untuk By-Pass Keamanan Chrome) */}
+                                        <button 
+                                            onClick={testAudio} 
+                                            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                            <IconPlay className="w-4 h-4" /> Test Suara & Izinkan Audio
+                                        </button>
                                     </div>
 
                                     <div className="mb-6">
@@ -576,8 +537,7 @@
 
                                     <div className="mb-2">
                                         <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconSettings className="w-4 h-4"/> Koreksi Jadwal (Menit)</h3>
-                                        <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Isi nilai - (minus) untuk mempercepat atau + (plus) untuk memperlambat.</p>
-                                        <div className="grid grid-cols-2 gap-2 md:gap-3">
+                                        <div className="grid grid-cols-2 gap-2 md:gap-3 mt-3">
                                             {['imsak', 'subuh', 'terbit', 'dhuha', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
                                                 <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
                                                     <span className={`text-xs md:text-sm capitalize font-medium ${theme.text}`}>{key}</span>
