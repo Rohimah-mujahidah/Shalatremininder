@@ -37,8 +37,8 @@ const adjustTimeString = (timeStr, offsetMinutes) => {
 // Fungsi Penentu Zona Waktu Kota
 const getCityTimeZone = (cityName) => {
     const name = cityName.toUpperCase();
-    if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA)/.test(name)) return "Asia/Jayapura"; // WIT
-    if (/(BALI|NUSA TENGGARA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR)/.test(name)) return "Asia/Makassar"; // WITA
+    if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; // WIT
+    if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar"; // WITA
     return "Asia/Jakarta"; // WIB
 };
 
@@ -49,6 +49,11 @@ const getLocalTime = (tz) => {
     } catch (e) {
         return new Date();
     }
+};
+
+const getInitialDateStr = (tz) => {
+    const d = getLocalTime(tz);
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 };
 
 // Fungsi aman untuk mengambil localStorage
@@ -71,6 +76,7 @@ export default function App() {
     const [jadwal, setJadwal] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(getLocalTime(cityTimezone));
+    const [currentDateStr, setCurrentDateStr] = useState(() => getInitialDateStr(cityTimezone));
 
     // State Pengaturan (Settings)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -113,6 +119,13 @@ export default function App() {
             const now = getLocalTime(cityTimezone);
             setCurrentTime(now);
 
+            // Cek pergantian hari (jam 00:00) untuk perbarui jadwal otomatis
+            const newDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+            setCurrentDateStr(prev => {
+                if (prev !== newDateStr) return newDateStr;
+                return prev;
+            });
+
             // Cek Waktu Adzan
             if (adjustedJadwal && audioEnabled) {
                 const currentHHMM = formatTimeDisplay(now.getHours(), now.getMinutes());
@@ -145,18 +158,12 @@ export default function App() {
             .catch(err => console.error("Gagal mengambil kota", err));
     }, []);
 
-    // Mengambil Jadwal ketika ID Kota Berubah
+    // Mengambil Jadwal ketika ID Kota Berubah atau Berganti Hari
     useEffect(() => {
-        if (!selectedCityId) return;
+        if (!selectedCityId || !currentDateStr) return;
         setLoading(true);
-        
-        // Gunakan tanggal real di kota tersebut
-        const d = getLocalTime(cityTimezone);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const date = String(d.getDate()).padStart(2, '0');
 
-        fetch(`https://api.myquran.com/v2/sholat/jadwal/${selectedCityId}/${year}/${month}/${date}`)
+        fetch(`https://api.myquran.com/v2/sholat/jadwal/${selectedCityId}/${currentDateStr}`)
             .then(res => res.json())
             .then(data => {
                 if (data.status) {
@@ -168,7 +175,7 @@ export default function App() {
                 console.error("Gagal mengambil jadwal", err);
                 setLoading(false);
             });
-    }, [selectedCityId, cityTimezone]);
+    }, [selectedCityId, currentDateStr]);
 
     // Handle Pencarian Kota
     const handleCityChange = (e) => {
@@ -180,6 +187,7 @@ export default function App() {
             const tz = getCityTimeZone(found.lokasi);
             setCityTimezone(tz);
             setCurrentTime(getLocalTime(tz)); 
+            setCurrentDateStr(getInitialDateStr(tz));
             
             try {
                 localStorage.setItem('sholat_city_name', found.lokasi);
@@ -197,6 +205,26 @@ export default function App() {
         const maghrib = parseTime(adjustedJadwal.maghrib, 0, base);
         return currentTime >= terbit && currentTime < maghrib;
     }, [currentTime, adjustedJadwal, cityTimezone]);
+
+    const tzLabel = useMemo(() => {
+        if (cityTimezone === "Asia/Jayapura") return "WIT";
+        if (cityTimezone === "Asia/Makassar") return "WITA";
+        return "WIB";
+    }, [cityTimezone]);
+
+    const displayDate = useMemo(() => {
+        try {
+            return new Intl.DateTimeFormat('id-ID', {
+                timeZone: cityTimezone,
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            }).format(new Date());
+        } catch (e) {
+            return jadwal?.tanggal || "";
+        }
+    }, [currentDateStr, cityTimezone, jadwal]);
 
     // Konfigurasi Tema Tailwind Dinamis
     const theme = {
@@ -331,10 +359,11 @@ export default function App() {
                         </div>
                     </div>
                     <div className="text-center sm:text-right w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-slate-300/20 pt-3 sm:pt-0">
-                        <div className={`text-xs md:text-sm ${theme.textMuted} font-medium`}>{jadwal.tanggal}</div>
+                        <div className={`text-xs md:text-sm ${theme.textMuted} font-medium`}>{displayDate}</div>
                         <div className="text-2xl sm:text-3xl font-mono font-bold tracking-widest mt-0 sm:mt-1 flex items-baseline">
                             {formatTimeDisplay(currentTime.getHours(), currentTime.getMinutes())}
                             <span className="text-sm sm:text-lg text-emerald-500 ml-1">:{currentTime.getSeconds().toString().padStart(2, '0')}</span>
+                            <span className={`text-xs sm:text-sm ${theme.textMuted} ml-2 font-sans tracking-normal font-semibold`}>{tzLabel}</span>
                         </div>
                     </div>
                 </div>
