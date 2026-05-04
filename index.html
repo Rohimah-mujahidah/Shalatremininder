@@ -37,9 +37,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW Terdaftar'))
-                    .catch(err => console.log('SW Gagal:', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Gagal:', err));
             });
         }
     </script>
@@ -113,18 +111,58 @@
             const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
             const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
             const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
+            const [audioStatus, setAudioStatus] = useState("Menyiapkan audio...");
 
             const playedAdzanRef = useRef(null);
             const adzanAudioRef = useRef(null);
+            const isAudioUnlocked = useRef(false);
 
-            // Inisialisasi Audio dengan Format MP3 yang lebih aman
+            // --- AUDIO INITIALIZATION & ERROR HANDLING ---
             useEffect(() => {
-                // SANGAT DISARANKAN: Unduh file mp3 dan letakkan di folder assets/audio/adzan.mp3
-                // URL di bawah hanya sebagai fallback/contoh online
-                adzanAudioRef.current = new Audio('./assets/audio/adzan.mp3'); 
-                // Jika file lokal belum dibuat, gunakan fallback ini sementara:
-                adzanAudioRef.current.src = "https://raw.githubusercontent.com/islamic-network/cdn/master/adhan/makkah.mp3";
-                adzanAudioRef.current.preload = "auto";
+                const audio = new Audio();
+                audio.preload = "auto";
+                
+                // Set sumber utama ke lokal
+                audio.src = './assets/audio/adzan.mp3';
+
+                // Jika file lokal gagal (404/rusak), otomatis beralih ke CDN aman
+                audio.onerror = () => {
+                    if (audio.src.includes('assets/audio/adzan.mp3')) {
+                        console.warn("File adzan lokal gagal dimuat. Menggunakan fallback online.");
+                        setAudioStatus("Menggunakan fallback online (lokal error)");
+                        // Menggunakan server MyQuran yang ringan & terpercaya
+                        audio.src = 'https://files.myquran.com/audio/adzan/adzan_makkah.mp3';
+                        audio.load();
+                    }
+                };
+
+                audio.oncanplaythrough = () => {
+                    setAudioStatus("Audio siap diputar");
+                };
+
+                adzanAudioRef.current = audio;
+
+                // Unlocker (Hanya dieksekusi 1x saat user sentuh layar pertama kali)
+                const unlockAudio = () => {
+                    if (!isAudioUnlocked.current && adzanAudioRef.current) {
+                        adzanAudioRef.current.play().then(() => {
+                            adzanAudioRef.current.pause();
+                            adzanAudioRef.current.currentTime = 0;
+                            isAudioUnlocked.current = true;
+                            console.log("Audio berhasil di-unlock.");
+                        }).catch(e => console.log("Menunggu unlock..."));
+                    }
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
+
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+
+                return () => {
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
             }, []);
 
             const saveSetting = (key, value) => {
@@ -163,23 +201,24 @@
                             key => adjustedJadwal[key] === currentHHMM
                         );
                         
-                        // Perbaikan: Syarat detik dihilangkan agar tidak terlewat saat browser standby/di-throttle
+                        // Sistem pemicu audio (TIDAK LAGI mengecek detik ke-0, agar kebal throttle saat layar redup)
                         if (isWajibAdzan) {
                             const adzanId = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
                             
-                            // Hanya putar jika ID (tanggal & waktu) belum pernah diputar hari ini
+                            // Jika adzan hari ini di waktu tsb belum diputar
                             if (playedAdzanRef.current !== adzanId) {
                                 playedAdzanRef.current = adzanId;
                                 if (adzanAudioRef.current) {
                                     adzanAudioRef.current.currentTime = 0;
                                     adzanAudioRef.current.play().catch(e => {
-                                        console.log("Audio diblokir oleh sistem HP. Harap gunakan tombol 'Test Suara' di pengaturan.");
+                                        console.log("OS Mencegah autoplay. User harus buka aplikasi ke layar depan.");
+                                        setAudioStatus("Gagal putar otomatis. OS HP memblokir background audio.");
                                     });
                                 }
                             }
                         }
                     }
-                }, 1000);
+                }, 1000); // interval 1 detik
                 return () => clearInterval(timer);
             }, [cityTimezone, adjustedJadwal, audioEnabled]);
 
@@ -223,7 +262,15 @@
             const testAudio = () => {
                 if(adzanAudioRef.current) {
                     adzanAudioRef.current.currentTime = 0;
-                    adzanAudioRef.current.play().catch(e => alert("Gagal memutar audio: " + e.message));
+                    adzanAudioRef.current.play()
+                        .then(() => {
+                            setAudioStatus("Berhasil diputar!");
+                            isAudioUnlocked.current = true;
+                        })
+                        .catch(e => {
+                            alert("Gagal memutar audio: " + e.message + "\nPastikan format file Anda mp3 dan terbaca.");
+                            setAudioStatus("Gagal: " + e.message);
+                        });
                 }
             };
 
@@ -246,9 +293,7 @@
                     return new Intl.DateTimeFormat('id-ID', {
                         timeZone: cityTimezone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
                     }).format(new Date());
-                } catch (e) {
-                    return jadwal?.tanggal || "";
-                }
+                } catch (e) { return jadwal?.tanggal || ""; }
             }, [currentDateStr, cityTimezone, jadwal]);
 
             const theme = {
@@ -407,14 +452,7 @@
                                         <span>Selesai: {currentPhase?.end.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</span>
                                     </div>
                                     <div className={`h-4 md:h-6 w-full ${theme.progressBg} rounded-full overflow-hidden relative shadow-inner border transition-colors duration-500`}>
-                                        <div 
-                                            className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${
-                                                currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-red-500 to-red-400' :
-                                                currentPhase?.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-400' :
-                                                'bg-gradient-to-r from-emerald-500 to-teal-400'
-                                            }`}
-                                            style={{ width: `${progress}%` }}
-                                        >
+                                        <div className={`h-full relative transition-all duration-1000 ease-linear rounded-full ${currentPhase?.type === 'haram' ? 'bg-gradient-to-r from-red-500 to-red-400' : currentPhase?.type === 'warning' ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`} style={{ width: `${progress}%` }}>
                                             <div className="absolute right-0 top-0 bottom-0 w-3 md:w-4 bg-white/40 blur-[2px]"></div>
                                         </div>
                                     </div>
@@ -493,7 +531,7 @@
                                                     {audioEnabled ? <IconVolume2 className="w-5 h-5 text-emerald-500" /> : <IconVolumeX className="w-5 h-5 text-red-500" />}
                                                     Suara Adzan
                                                 </h3>
-                                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat masuk waktu wajib</p>
+                                                <p className={`text-[10px] md:text-xs ${theme.textMuted} mt-1`}>Putar otomatis saat aplikasi terbuka/standby</p>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input type="checkbox" className="sr-only peer" checked={audioEnabled} onChange={(e) => {
@@ -505,18 +543,23 @@
                                             </label>
                                         </div>
                                         
-                                        {/* TOMBOL TEST AUDIO (Untuk By-Pass Keamanan Chrome) */}
+                                        {/* Status Audio (Sangat membantu untuk debugging) */}
+                                        <div className="mb-3 text-xs opacity-70 p-2 bg-black/10 rounded font-mono">
+                                            Status: {audioStatus}
+                                        </div>
+
+                                        {/* TOMBOL TEST AUDIO */}
                                         <button 
                                             onClick={testAudio} 
                                             className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
                                         >
                                             <IconPlay className="w-4 h-4" /> Test Suara & Izinkan Audio
                                         </button>
+                                        <p className="text-[10px] mt-2 text-red-400 text-center">*Jika file lokal gagal, akan otomatis pakai online.</p>
                                     </div>
 
                                     <div className="mb-6">
                                         <h3 className={`font-semibold ${theme.text} mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base`}><IconClock className="w-4 h-4"/> Jeda Waktu Iqomah (Menit)</h3>
-                                        <p className={`text-[10px] md:text-xs ${theme.textMuted} mb-3`}>Waktu tunggu khusus (Iqomah) setelah Adzan.</p>
                                         <div className="grid grid-cols-2 gap-2 md:gap-3">
                                             {['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'].map(key => (
                                                 <div key={key} className={`flex items-center justify-between p-2 md:p-2.5 rounded-lg border ${theme.border} bg-slate-500/5`}>
