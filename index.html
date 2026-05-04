@@ -124,8 +124,6 @@
 
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
-            // Menyimpan State URL Adzan (Link disembunyikan dari antarmuka)
-            const [adzanUrl] = useState(() => safeGetItem('sholat_adzan_url', "https://rohimah-mujahidah.github.io/Shalatremininder/assets/audio/adzan2.mp3"));
             const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
             const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
             const [audioStatus, setAudioStatus] = useState("Menyiapkan audio...");
@@ -135,17 +133,29 @@
             const isAudioUnlocked = useRef(false);
             const adzanAudioRef = useRef(null);
 
+            const FALLBACK_URL = "https://rohimah-mujahidah.github.io/Shalatremininder/assets/audio/adzan2.mp3";
+            const PRIMARY_URL = "./assets/audio/adzan2.mp3";
+
             // Audio instance initialization dan unlocker dipanggil sekali
             useEffect(() => {
                 const audio = new Audio();
                 audio.preload = "auto";
+                audio.src = PRIMARY_URL;
                 
                 audio.oncanplaythrough = () => {
-                    setAudioStatus("Audio siap diputar!");
+                    setAudioStatus(audio.src.includes(FALLBACK_URL) ? "Audio siap (Server Pusat)" : "Audio siap (Lokal)");
                 };
 
                 audio.onerror = (e) => {
-                    setAudioStatus("Gagal memuat URL audio tersebut. Pastikan link valid.");
+                    // JIKA FILE LOKAL GAGAL (404/Rusak), OTOMATIS BERALIH KE SERVER
+                    if (!audio.src.includes(FALLBACK_URL)) {
+                        console.warn("File lokal gagal. Beralih ke server pusat...");
+                        audio.src = FALLBACK_URL;
+                        audio.load();
+                        setAudioStatus("Lokal gagal. Menggunakan server pusat.");
+                    } else {
+                        setAudioStatus("Error: Gagal memuat semua sumber audio.");
+                    }
                 };
 
                 audio.onplay = () => setIsPlaying(true);
@@ -180,15 +190,6 @@
                     document.removeEventListener('touchstart', unlockAudio);
                 };
             }, []);
-
-            // Memperbarui sumber (src) audio secara reaktif kapanpun adzanUrl diubah
-            useEffect(() => {
-                if (adzanAudioRef.current) {
-                    adzanAudioRef.current.src = adzanUrl;
-                    adzanAudioRef.current.load();
-                    setAudioStatus("Memuat URL sumber baru...");
-                }
-            }, [adzanUrl]);
 
             const saveSetting = (key, value) => {
                 try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
@@ -295,8 +296,9 @@
                         adzanAudioRef.current.currentTime = 0;
                         setAudioStatus("Audio dihentikan.");
                     } else {
-                        // Jika sedang mati, putar dari awal
-                        if (adzanAudioRef.current.error) {
+                        // Pastikan tidak nyangkut di file rusak
+                        if (adzanAudioRef.current.error || adzanAudioRef.current.src === "") {
+                            adzanAudioRef.current.src = FALLBACK_URL;
                             adzanAudioRef.current.load();
                         }
                         
@@ -305,7 +307,7 @@
                         
                         if (playPromise !== undefined) {
                             playPromise.then(() => {
-                                setAudioStatus("Audio Berhasil Diputar!");
+                                setAudioStatus(adzanAudioRef.current.src.includes(FALLBACK_URL) ? "Audio Server Diputar!" : "Audio Lokal Diputar!");
                                 isAudioUnlocked.current = true;
                             }).catch(e => {
                                 setAudioStatus("Error memutar: " + e.message);
