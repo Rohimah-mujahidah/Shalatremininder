@@ -3,20 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- KEAMANAN ANDROID TERBARU: Memaksa semua request menjadi HTTPS -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    
     <title>Jadwal Sholat Interaktif</title>
 
-    <!-- 1. Menghubungkan Web App Manifest untuk PWA -->
-    <link rel="manifest" href="manifest.json">
+    <!-- Menghubungkan Web App Manifest untuk PWA -->
+    <link rel="manifest" href="./manifest.json">
 
-    <!-- 2. Pengaturan Meta Tags Mobile -->
+    <!-- Pengaturan Meta Tags Mobile -->
     <meta name="theme-color" content="#0ea5e9">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Jadwal Sholat">
     
-    <!-- 3. Favicon & Apple Touch Icon (Pastikan path file ini benar di repo Anda) -->
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    <!-- Favicon & Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
+    <link rel="icon" type="image/x-icon" href="./assets/icons/favicon.ico">
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,13 +30,12 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- Babel untuk kompilasi JSX di browser -->
+    <!-- Babel untuk kompilasi JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        /* Smooth Scrollbar custom */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -41,10 +45,21 @@
 <body class="bg-slate-900 text-slate-50 overflow-x-hidden">
     <div id="root"></div>
 
+    <!-- REGISTRASI SERVICE WORKER (Wajib untuk Android/PWA Terbaru) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker terdaftar di scope:', reg.scope))
+                    .catch(err => console.log('Pendaftaran Service Worker gagal:', err));
+            });
+        }
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- Definisi Ikon SVG Mandiri (Menggantikan Library External agar lebih ringan) ---
+        // --- Ikon SVG (Dipendekkan agar fokus pada logika) ---
         const IconMoon = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
         const IconSunrise = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v6"/><path d="M8.4 10.4 4.2 6.2"/><path d="M15.6 10.4l4.2-4.2"/><path d="M22 18h-2"/><path d="M4 18H2"/><path d="M12 14v4"/><path d="M8 22h8"/></svg>;
         const IconSun = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
@@ -58,23 +73,16 @@
         const IconVolumeX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
         const IconX = ({className}) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
-
-        // --- Fungsi Bantuan / Utility ---
-        const formatTimeDisplay = (hours, minutes) => {
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        };
-
+        // --- Fungsi Bantuan ---
+        const formatTimeDisplay = (hours, minutes) => `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         const parseTime = (timeStr, offsetDay = 0, baseDate = new Date()) => {
             if (!timeStr) return baseDate;
             const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number);
             const d = new Date(baseDate.getTime());
             d.setHours(hours, minutes, seconds, 0);
-            if (offsetDay !== 0) {
-                d.setDate(d.getDate() + offsetDay);
-            }
+            if (offsetDay !== 0) d.setDate(d.getDate() + offsetDay);
             return d;
         };
-
         const formatDuration = (ms) => {
             if (ms < 0) ms = 0;
             const hours = Math.floor(ms / (1000 * 60 * 60));
@@ -82,7 +90,6 @@
             const seconds = Math.floor((ms % (1000 * 60)) / 1000);
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         };
-
         const adjustTimeString = (timeStr, offsetMinutes) => {
             if (!timeStr) return timeStr;
             const [h, m] = timeStr.split(':').map(Number);
@@ -90,34 +97,23 @@
             d.setHours(h, m + (offsetMinutes || 0), 0, 0);
             return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         };
-
         const getCityTimeZone = (cityName) => {
             const name = cityName.toUpperCase();
-            if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; // WIT
-            if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar"; // WITA
-            return "Asia/Jakarta"; // WIB
+            if (/(PAPUA|MALUKU|TUAL|AMBON|TERNATE|TIDORE|BIAK|JAYAPURA|MERAUKE|MIMIKA|SORONG|MANOKWARI|FAKFAK|KAIMANA|NABIRE|KEPULAUAN ARU|HALMAHERA|BURU|SERAM|ASMAT|BOVEN|MAPPI|YAHUKIMO|PEGUNUNGAN)/.test(name)) return "Asia/Jayapura"; 
+            if (/(BALI|NUSA|SULAWESI|MAKASSAR|KENDARI|PALU|MANADO|GORONTALO|KALIMANTAN TIMUR|KALIMANTAN SELATAN|KALIMANTAN UTARA|BALIKPAPAN|SAMARINDA|BANJARMASIN|TARAKAN|BONTANG|MATARAM|KUPANG|BIMA|DENPASAR|NUNUKAN|KOTAMOBAGU|BAU-BAU|BITUNG|TOMOHON|KUTAI|BERAU|PASER|BULUNGAN|MALINAU)/.test(name)) return "Asia/Makassar";
+            return "Asia/Jakarta"; 
         };
-
-        const getLocalTime = (tz) => {
-            try { return new Date(new Date().toLocaleString('en-US', { timeZone: tz })); } catch (e) { return new Date(); }
-        };
-
+        const getLocalTime = (tz) => { try { return new Date(new Date().toLocaleString('en-US', { timeZone: tz })); } catch (e) { return new Date(); } };
         const getInitialDateStr = (tz) => {
             const d = getLocalTime(tz);
             return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
         };
-
         const safeGetItem = (key, defaultValue) => {
-            try {
-                const item = localStorage.getItem(key);
-                return item !== null ? JSON.parse(item) : defaultValue;
-            } catch (error) { return defaultValue; }
+            try { const item = localStorage.getItem(key); return item !== null ? JSON.parse(item) : defaultValue; } catch (error) { return defaultValue; }
         };
 
-        // --- Komponen Utama ---
         const App = () => {
             const [cities, setCities] = useState([]);
-            
             const [searchCity, setSearchCity] = useState(() => safeGetItem('sholat_city_name', "KOTA JAKARTA"));
             const [selectedCityId, setSelectedCityId] = useState(() => safeGetItem('sholat_city_id', "1301"));
             const [cityTimezone, setCityTimezone] = useState(() => safeGetItem('sholat_city_tz', "Asia/Jakarta"));
@@ -134,8 +130,30 @@
             const playedAdzanRef = useRef(null);
             const adzanAudioRef = useRef(null);
 
+            // --- AUDIO UNLOCKER UNTUK ANDROID ---
             useEffect(() => {
                 adzanAudioRef.current = new Audio('https://upload.wikimedia.org/wikipedia/commons/3/30/Adzan_of_Masjid_Al_Haram.ogg');
+                
+                // Minta izin ke browser Android dengan memutar audio sunyi di background saat pertama kali layar disentuh
+                const unlockAudioContext = () => {
+                    if (adzanAudioRef.current) {
+                        adzanAudioRef.current.play().then(() => {
+                            adzanAudioRef.current.pause();
+                            adzanAudioRef.current.currentTime = 0;
+                        }).catch(e => console.log('Menunggu interaksi user untuk unlock audio'));
+                    }
+                    // Hapus event listener agar tidak berat
+                    document.removeEventListener('click', unlockAudioContext);
+                    document.removeEventListener('touchstart', unlockAudioContext);
+                };
+
+                document.addEventListener('click', unlockAudioContext);
+                document.addEventListener('touchstart', unlockAudioContext);
+
+                return () => {
+                    document.removeEventListener('click', unlockAudioContext);
+                    document.removeEventListener('touchstart', unlockAudioContext);
+                };
             }, []);
 
             const saveSetting = (key, value) => {
@@ -178,7 +196,7 @@
                             playedAdzanRef.current = `${adjustedJadwal.tanggal}-${isWajibAdzan}`;
                             if (adzanAudioRef.current) {
                                 adzanAudioRef.current.currentTime = 0;
-                                adzanAudioRef.current.play().catch(e => console.log('Autoplay blocked by browser:', e));
+                                adzanAudioRef.current.play().catch(e => console.log('Autoplay audio diblokir oleh Android. Butuh klik layar.'));
                             }
                         }
                     }
