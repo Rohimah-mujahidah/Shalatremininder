@@ -50,6 +50,16 @@
         .bg-gradient-feminine {
             background: linear-gradient(135deg, #8c52ff, #d099ff);
         }
+        
+        /* Custom Animations for Modal */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-50 overflow-x-hidden">
@@ -161,6 +171,9 @@
             const [tahajjudAlarmEnabled, setTahajjudAlarmEnabled] = useState(() => safeGetItem('sholat_tahajjud_enabled', false));
             const [tahajjudCustomAudio, setTahajjudCustomAudio] = useState(() => safeGetItem('sholat_tahajjud_audio', null));
             const [isTahajjudRinging, setIsTahajjudRinging] = useState(false);
+            
+            // STATE DETAIL MODAL
+            const [selectedPrayerDetail, setSelectedPrayerDetail] = useState(null);
             
             // REFS
             const tahajjudAudioRef = useRef(null);
@@ -393,6 +406,75 @@
                 } catch (e) { return jadwal?.tanggal || ""; }
             }, [currentTime, cityTimezone, jadwal]);
 
+            // --- DATA DETAIL DALIL & MAZHAB ---
+            const prayerDetailsData = useMemo(() => ({
+                tahajjud: {
+                    title: "Tahajjud (Qiyamul Lail)",
+                    timeFrame: "Sepertiga malam setelah isya hingga terbit fajar sadiq.",
+                    description: "Sholat sunnah muakkad yang dikerjakan setelah tidur. Menjadi ciri khas orang saleh dan salah satu waktu paling mustajab untuk berdoa.",
+                    dalil: `"Dan pada sebagian malam, lakukanlah shalat tahajud (sebagai suatu ibadah) tambahan bagimu: mudah-mudahan Tuhanmu mengangkatmu ke tempat yang terpuji." (QS. Al-Isra: 79)`,
+                    source: "Al-Qur'an & Ijma Ulama"
+                },
+                imsak: {
+                    title: "Batas Sahur (Imsak)",
+                    timeFrame: "Sekitar 10-15 menit sebelum masuk waktu Subuh.",
+                    description: "Imsak bukanlah waktu haram makan secara mutlak, melainkan batas kehati-hatian (ihtiyat) agar tidak terlewat masuknya fajar sadiq saat bersahur.",
+                    dalil: `Dari Anas bin Malik: "Nabi SAW dan Zaid bin Tsabit makan sahur... Jarak antara selesai makan sahur dengan adzan adalah sekadar bacaan 50 ayat Al-Qur'an." (HR. Bukhari no. 1921)`,
+                    source: "Hadits Shahih Bukhari"
+                },
+                subuh: {
+                    title: "Sholat Subuh (Fajar)",
+                    timeFrame: "Terbitnya fajar sadiq (cahaya putih yang membentang horizontal di ufuk timur) hingga sebelum matahari terbit.",
+                    description: "Sholat wajib dua rakaat yang sangat agung karena disaksikan langsung oleh para malaikat pergantian malam dan siang.",
+                    dalil: `"Dirikanlah shalat dari sesudah matahari tergelincir sampai gelap malam dan (dirikanlah pula shalat) Subuh. Sesungguhnya shalat Subuh itu disaksikan (oleh malaikat)." (QS. Al-Isra: 78)`,
+                    source: "Al-Qur'an & Hadits"
+                },
+                syuruq: {
+                    title: "Syuruq (Terbit Matahari)",
+                    timeFrame: "Sejak matahari mulai terbit hingga meninggi seukuran satu tombak (berlangsung sekitar 15-20 menit).",
+                    description: "Waktu HARAM melaksanakan sholat sunnah mutlak. Diperbolehkan sholat sunnah setelah matahari benar-benar naik (masuk waktu Dhuha).",
+                    dalil: `"Tiga waktu yang Rasulullah melarang kami sholat dan menguburkan jenazah: saat matahari terbit hingga meninggi, saat matahari tepat di tengah, dan saat matahari tenggelam." (HR. Muslim)`,
+                    source: "Hadits Shahih Muslim"
+                },
+                dhuha: {
+                    title: "Sholat Dhuha",
+                    timeFrame: "Matahari naik setinggi tombak (±20 menit setelah syuruq) hingga menjelang waktu Dzuhur (Istiwa).",
+                    description: "Sholat sunnah yang bernilai sedekah bagi seluruh persendian tubuh dan sebagai jalan pembuka pintu rezeki.",
+                    dalil: `"Setiap pagi, setiap ruas tulang persendian kalian harus disedekahi... semuanya itu dapat dicukupi dengan dua rakaat shalat Dhuha." (HR. Muslim no. 720)`,
+                    source: "Hadits Shahih Muslim"
+                },
+                dzuhur: {
+                    title: "Sholat Dzuhur",
+                    timeFrame: "Tergelincirnya matahari ke arah barat (zawal) hingga panjang bayangan benda sama dengan tinggi benda tersebut.",
+                    description: "Sholat wajib di tengah hari. Disunnahkan mengakhirkan pelaksanaannya (al-ibrad) jika cuaca sangat terik panas.",
+                    dalil: `"Waktu shalat Dzuhur adalah jika matahari telah condong (ke barat) dan bayangan seseorang sama dengan tingginya, selama belum masuk waktu Ashar." (HR. Muslim no. 612)`,
+                    source: "Hadits Shahih Muslim"
+                },
+                ashar: {
+                    title: "Sholat Ashar",
+                    timeFrame: asrMethod == 1 
+                        ? "Bayangan benda menjadi DUA KALI LIPAT panjang aslinya hingga matahari terbenam. (Kalkulasi: Mazhab Hanafi)"
+                        : "Bayangan benda SAMA PANJANG dengan aslinya hingga matahari terbenam. (Kalkulasi: Jumhur - Syafii, Maliki, Hambali)",
+                    description: "Dikenal sebagai Sholat Wustha (Pertengahan) yang sangat ditekankan untuk dijaga secara khusus.",
+                    dalil: `"Peliharalah semua shalat(mu), dan (peliharalah) shalat wustha (Ashar). Berdirilah untuk Allah (dalam shalatmu) dengan khusyuk." (QS. Al-Baqarah: 238)`,
+                    source: asrMethod == 1 ? "Al-Qur'an & Fiqih Mazhab Hanafi" : "Al-Qur'an & Fiqih Jumhur Ulama"
+                },
+                maghrib: {
+                    title: "Sholat Maghrib",
+                    timeFrame: "Terbenamnya bulatan matahari secara sempurna di ufuk barat hingga hilangnya mega merah (syafaq ahmar).",
+                    description: "Sholat wajib yang menandai pergantian hari dalam kalender Hijriah sekaligus sebagai waktu berbuka puasa.",
+                    dalil: `"Waktu shalat Maghrib adalah selama warna merah (mega di ufuk barat) belum hilang." (HR. Muslim no. 612)`,
+                    source: "Hadits Shahih Muslim"
+                },
+                isya: {
+                    title: "Sholat Isya",
+                    timeFrame: "Hilangnya mega merah di ufuk barat hingga pertengahan malam (waktu ikhtiyar) atau fajar (waktu jawaz).",
+                    description: "Sholat wajib penutup hari. Dianjurkan diakhirkan (menjelang sepertiga malam) selama tidak memberatkan jamaah.",
+                    dalil: `"Waktu shalat Isya adalah hingga pertengahan malam (yang pertengahan)." (HR. Muslim no. 612)`,
+                    source: "Hadits Shahih Muslim"
+                }
+            }), [asrMethod]);
+
             // --- FEMININE THEME VARIABLES ---
             const theme = {
                 bg: isDayTime ? 'bg-fuchsia-50/50' : 'bg-[#1a1128]',
@@ -441,15 +523,15 @@
             const cardsData = useMemo(() => {
                 if (!adjustedJadwal) return [];
                 return [
-                    { title: "Tahajjud", time: "01:00", end: adjustedJadwal.imsak, icon: IconMoon, desc: "Sepertiga malam akhir" },
-                    { title: "Sahur / Imsak", time: adjustedJadwal.imsak, end: adjustedJadwal.subuh, icon: IconClock, desc: "Batas waktu sahur" },
-                    { title: "Subuh", time: adjustedJadwal.subuh, end: adjustedJadwal.terbit, icon: IconSunrise, desc: "Sholat Wajib" },
-                    { title: "Syuruq", time: adjustedJadwal.terbit, end: adjustedJadwal.dhuha, icon: IconSunrise, desc: "Waktu haram sholat", isHaram: true },
-                    { title: "Dhuha", time: adjustedJadwal.dhuha, end: adjustedJadwal.dzuhur, icon: IconSun, desc: "Sholat Sunnah" },
-                    { title: "Dzuhur", time: adjustedJadwal.dzuhur, end: adjustedJadwal.ashar, icon: IconSun, desc: "Sholat Wajib" },
-                    { title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: IconSunset, desc: "Sholat Wajib" },
-                    { title: "Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: IconSunset, desc: "Sholat Wajib" },
-                    { title: "Isya", time: adjustedJadwal.isya, end: "00:00", icon: IconCloudMoon, desc: "Sholat Wajib" },
+                    { id: 'tahajjud', title: "Tahajjud", time: "01:00", end: adjustedJadwal.imsak, icon: IconMoon, desc: "Sepertiga malam akhir" },
+                    { id: 'imsak', title: "Sahur / Imsak", time: adjustedJadwal.imsak, end: adjustedJadwal.subuh, icon: IconClock, desc: "Batas waktu sahur" },
+                    { id: 'subuh', title: "Subuh", time: adjustedJadwal.subuh, end: adjustedJadwal.terbit, icon: IconSunrise, desc: "Sholat Wajib" },
+                    { id: 'syuruq', title: "Syuruq", time: adjustedJadwal.terbit, end: adjustedJadwal.dhuha, icon: IconSunrise, desc: "Waktu haram sholat", isHaram: true },
+                    { id: 'dhuha', title: "Dhuha", time: adjustedJadwal.dhuha, end: adjustedJadwal.dzuhur, icon: IconSun, desc: "Sholat Sunnah" },
+                    { id: 'dzuhur', title: "Dzuhur", time: adjustedJadwal.dzuhur, end: adjustedJadwal.ashar, icon: IconSun, desc: "Sholat Wajib" },
+                    { id: 'ashar', title: "Ashar", time: adjustedJadwal.ashar, end: adjustedJadwal.maghrib, icon: IconSunset, desc: "Sholat Wajib" },
+                    { id: 'maghrib', title: "Maghrib", time: adjustedJadwal.maghrib, end: adjustedJadwal.isya, icon: IconSunset, desc: "Sholat Wajib" },
+                    { id: 'isya', title: "Isya", time: adjustedJadwal.isya, end: "00:00", icon: IconCloudMoon, desc: "Sholat Wajib" },
                 ];
             }, [adjustedJadwal]);
 
@@ -630,7 +712,11 @@
                                         const activeStyle = card.isHaram ? theme.cardActiveHaram : theme.cardActiveNormal;
                                         
                                         return (
-                                            <div key={idx} className={`relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform ${isActive ? `${activeStyle} sm:scale-105 z-10` : `${theme.card}`}`}>
+                                            <div 
+                                                key={idx} 
+                                                onClick={() => setSelectedPrayerDetail(card.id)}
+                                                className={`cursor-pointer group relative overflow-hidden rounded-xl md:rounded-2xl p-4 md:p-5 border transition-all duration-500 transform hover:-translate-y-1 hover:shadow-[0_10px_30px_rgb(208,153,255,0.2)] ${isActive ? `${activeStyle} sm:scale-105 z-10` : `${theme.card}`}`}
+                                            >
                                                 {isActive && (
                                                     <span className="absolute top-2 right-2 flex h-2.5 w-2.5 md:h-3 md:w-3">
                                                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${card.isHaram ? 'bg-rose-400' : 'bg-secondary'} opacity-75`}></span>
@@ -638,7 +724,7 @@
                                                     </span>
                                                 )}
                                                 
-                                                <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-colors duration-500 ${isActive ? (card.isHaram ? 'bg-rose-500/20 text-rose-500' : 'bg-gradient-feminine text-white shadow-md') : `bg-fuchsia-500/10 ${theme.textMuted}`}`}>
+                                                <div className={`mb-3 md:mb-4 w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 ${isActive ? (card.isHaram ? 'bg-rose-500/20 text-rose-500' : 'bg-gradient-feminine text-white shadow-md') : `bg-fuchsia-500/10 ${theme.textMuted} group-hover:bg-primary/20 group-hover:text-primary`}`}>
                                                     <card.icon className="w-5 h-5 md:w-6 md:h-6" />
                                                 </div>
                                                 
@@ -652,12 +738,79 @@
                                                         <div className={`h-full ${card.isHaram ? 'bg-rose-500' : 'bg-gradient-feminine'}`} style={{width: `${progress}%`}}></div>
                                                     </div>
                                                 )}
+                                                
+                                                {/* Hint Info Icon on Hover */}
+                                                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                    <IconInfo className={`w-4 h-4 ${isActive ? (card.isHaram ? 'text-rose-400' : 'text-primary') : 'text-primary/50'}`} />
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
                         </div>
+
+                        {/* MODAL DETAIL WAKTU SHOLAT (INFO & DALIL) */}
+                        {selectedPrayerDetail && (
+                            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[#1a1128]/80 backdrop-blur-md animate-[fadeIn_0.3s_ease-out_forwards]" onClick={(e) => { if(e.target === e.currentTarget) setSelectedPrayerDetail(null); }}>
+                                <div className={`${theme.panel} border w-full max-w-xl rounded-3xl p-6 md:p-8 relative shadow-2xl animate-[scaleIn_0.3s_ease-out_forwards] overflow-hidden`}>
+                                    
+                                    {/* Abstract Decoration */}
+                                    <div className="absolute -top-32 -right-32 w-64 h-64 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+                                    <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-secondary/20 rounded-full blur-3xl pointer-events-none"></div>
+                                    
+                                    <button onClick={() => setSelectedPrayerDetail(null)} className={`absolute top-4 right-4 p-2 rounded-full hover:bg-fuchsia-500/20 transition-colors z-10 ${theme.text}`}>
+                                        <IconX className="w-6 h-6" />
+                                    </button>
+
+                                    <div className="relative z-10">
+                                        <div className={`mb-5 w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-feminine text-white`}>
+                                            {(() => {
+                                                const IconCard = cardsData.find(c => c.id === selectedPrayerDetail)?.icon || IconClock;
+                                                return <IconCard className="w-6 h-6 md:w-8 md:h-8" />;
+                                            })()}
+                                        </div>
+
+                                        <h2 className="text-2xl md:text-3xl font-bold mb-2 text-gradient">
+                                            {prayerDetailsData[selectedPrayerDetail].title}
+                                        </h2>
+                                        
+                                        <div className={`text-xs md:text-sm font-semibold px-4 py-1.5 rounded-full inline-flex items-center gap-2 mb-6 border ${theme.border} bg-fuchsia-500/10 ${theme.text}`}>
+                                            <IconClock className="w-4 h-4 text-primary" />
+                                            Rentang: {cardsData.find(c => c.id === selectedPrayerDetail)?.time} - {cardsData.find(c => c.id === selectedPrayerDetail)?.end} {cityTimezone === 'Asia/Jakarta' ? 'WIB' : (cityTimezone === 'Asia/Makassar' ? 'WITA' : 'WIT')}
+                                        </div>
+
+                                        <div className="space-y-5">
+                                            <div>
+                                                <h4 className={`text-sm font-bold flex items-center gap-2 ${theme.text}`}><IconSunrise className="w-4 h-4 text-secondary" /> Definisi Rentang Waktu</h4>
+                                                <p className={`text-sm md:text-base mt-1.5 leading-relaxed ${theme.textMuted} ${selectedPrayerDetail === 'ashar' && asrMethod == 1 ? 'font-semibold text-rose-400' : ''}`}>
+                                                    {prayerDetailsData[selectedPrayerDetail].timeFrame}
+                                                </p>
+                                            </div>
+                                            
+                                            <div>
+                                                <h4 className={`text-sm font-bold flex items-center gap-2 ${theme.text}`}><IconInfo className="w-4 h-4 text-primary" /> Penjelasan</h4>
+                                                <p className={`text-sm md:text-base mt-1.5 leading-relaxed ${theme.textMuted}`}>
+                                                    {prayerDetailsData[selectedPrayerDetail].description}
+                                                </p>
+                                            </div>
+
+                                            <div className={`p-4 md:p-5 rounded-2xl border ${theme.border} bg-fuchsia-500/5 mt-6 shadow-inner`}>
+                                                <h4 className={`text-xs md:text-sm font-bold mb-2 ${theme.text} uppercase tracking-wider opacity-80`}>Dalil Dasar Penentuan Waktu</h4>
+                                                <blockquote className={`text-sm md:text-base italic leading-relaxed ${theme.textMuted} border-l-4 border-primary pl-4 py-1`}>
+                                                    {prayerDetailsData[selectedPrayerDetail].dalil}
+                                                </blockquote>
+                                                <div className="flex justify-end mt-3">
+                                                    <span className={`text-[10px] md:text-xs font-bold px-3 py-1 bg-primary/10 text-primary rounded-lg border border-primary/20`}>
+                                                        Sumber: {prayerDetailsData[selectedPrayerDetail].source}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* MODAL SETTINGS TEMA FEMINIM */}
                         {isSettingsOpen && (
