@@ -110,7 +110,7 @@
             const [isSettingsOpen, setIsSettingsOpen] = useState(false);
             const [audioEnabled, setAudioEnabled] = useState(() => safeGetItem('sholat_audio', true));
             // Menyimpan State URL Adzan (Defaultnya CDN, tapi dapat diedit)
-            const [adzanUrl, setAdzanUrl] = useState(() => safeGetItem('sholat_adzan_url', "https://api.aladhan.com/media/audio/adhan/al-afasy.mp3"));
+            const [adzanUrl, setAdzanUrl] = useState(() => safeGetItem('sholat_adzan_url', "https://rohimah-mujahidah.github.io/Shalatremininder/assets/audio/adzan2.mp3"));
             const [offsets, setOffsets] = useState(() => safeGetItem('sholat_offsets', { imsak: 0, subuh: 0, terbit: 0, dhuha: 0, dzuhur: 0, ashar: 0, maghrib: 0, isya: 0 }));
             const [qomatDurations, setQomatDurations] = useState(() => safeGetItem('sholat_qomat', { subuh: 10, dzuhur: 10, ashar: 10, maghrib: 10, isya: 10 }));
             const [audioStatus, setAudioStatus] = useState("Menyiapkan audio...");
