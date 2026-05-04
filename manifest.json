@@ -1,18 +1,19 @@
 {
-  "name": "Shalat Reminder",
-  "short_name": "App Web",
-  "start_url": "https://rohimah-mujahidah.github.io/Shalatremininder/",
+  "name": "Reminder Sholat",
+  "short_name": "Jadwal Sholat",
+  "start_url": ".",
+  "scope": "/Shalatremininder/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#0f172a",
   "theme_color": "#0ea5e9",
   "icons": [
     {
-      "src": "assets/icons/icon-192.png",
+      "src": "./assets/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "assets/icons/icon-512.png",
+      "src": "./assets/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
